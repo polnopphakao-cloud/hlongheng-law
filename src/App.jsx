@@ -1,1 +1,1 @@
-src/main.jsx
+src/App.jsx
