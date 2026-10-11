@@ -1,29 +1,27 @@
 export default function App() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#0f172a",
-        color: "#ffffff",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center"
-      }}
-    >
-      <div style={{ textAlign: "center" }}>
-        <h1
-          style={{
-            color: "#f59e0b",
-            fontSize: "48px"
-          }}
-        >
-          สำนักงานกฎหมายนพเก้า ทนายความ
-        </h1>
+    <main className="page">
+      <section className="hero">
+        <div className="logo">⚖</div>
 
-        <p>
+        <p className="eyebrow">NOPPAKAO LAW OFFICE</p>
+
+        <h1>สำนักงานกฎหมายนพเก้า ทนายความ</h1>
+
+        <p className="subtitle">
           รับว่าความคดีแพ่งและคดีอาญาทั่วราชอาณาจักร
         </p>
-      </div>
-    </div>
+
+        <p className="description">
+          ให้คำปรึกษา วิเคราะห์ข้อกฎหมาย และดำเนินคดี
+          โดยยึดมั่นในความสุจริตและหลักนิติธรรม
+        </p>
+
+        <div className="actions">
+          <button className="primary">ปรึกษาคดี</button>
+          <button className="secondary">สมัครสมาชิก</button>
+        </div>
+      </section>
+    </main>
   );
 }
