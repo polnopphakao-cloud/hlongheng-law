@@ -1,21 +1,134 @@
-import {useEffect,useState} from "react";
-import {createUserWithEmailAndPassword,onAuthStateChanged,signInWithEmailAndPassword,signOut,updateProfile} from "firebase/auth";
-import {doc,getDoc,serverTimestamp,setDoc} from "firebase/firestore";
-import {auth,db} from "./lib/firebase";
+import { useEffect, useState } from "react";
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile
+} from "firebase/auth";
+import {
+  collection,
+  doc,
+  getCountFromServer,
+  getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc
+} from "firebase/firestore";
+import { auth, db } from "./lib/firebase";
 
-const empty={name:"",email:"",password:""};
-export default function App(){
- const [user,setUser]=useState(null),[profile,setProfile]=useState(null),[mode,setMode]=useState("home"),[form,setForm]=useState(empty),[msg,setMsg]=useState("");
- useEffect(()=>onAuthStateChanged(auth,async u=>{setUser(u); if(!u){setProfile(null);return;} const s=await getDoc(doc(db,"users",u.uid)); setProfile(s.exists()?s.data():null); setMode("dashboard");}),[]);
- async function register(e){e.preventDefault();setMsg("");try{const c=await createUserWithEmailAndPassword(auth,form.email,form.password);await updateProfile(c.user,{displayName:form.name});await setDoc(doc(db,"users",c.user.uid),{name:form.name,email:form.email,role:"member",plan:"free",questionLimit:0,questionUsed:0,status:"active",createdAt:serverTimestamp()});setMsg("สมัครสมาชิกสำเร็จ");}catch(err){setMsg(err.message)}}
- async function login(e){e.preventDefault();setMsg("");try{await signInWithEmailAndPassword(auth,form.email,form.password)}catch(err){setMsg(err.message)}}
- const isAdmin=profile?.role==="admin";
- if(mode==="auth") return <Auth form={form} setForm={setForm} register={register} login={login} msg={msg} back={()=>setMode("home")}/>;
- if(user&&mode==="dashboard") return <Dashboard user={user} profile={profile} isAdmin={isAdmin} logout={()=>signOut(auth)} home={()=>setMode("home")}/>;
- return <main className="page"><section className="hero"><div className="logo">⚖</div><p className="eyebrow">NOPPAKAO LAW OFFICE</p><h1>สำนักงานกฎหมายนพเก้า ทนายความ</h1><p className="subtitle">รับว่าความคดีแพ่งและคดีอาญาทั่วราชอาณาจักร</p><p className="description">ให้คำปรึกษา วิเคราะห์ข้อกฎหมาย และดำเนินคดี โดยยึดมั่นในความสุจริตและหลักนิติธรรม</p><div className="actions"><button className="primary">ปรึกษาคดี</button><button className="secondary" onClick={()=>setMode(user?"dashboard":"auth")}>{user?"แดชบอร์ด":"สมัครสมาชิก / เข้าสู่ระบบ"}</button></div></section></main>
+const empty = { name: "", email: "", password: "" };
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [mode, setMode] = useState("home");
+  const [form, setForm] = useState(empty);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => onAuthStateChanged(auth, async (u) => {
+    setUser(u);
+    if (!u) {
+      setProfile(null);
+      setIsAdmin(false);
+      setMode("home");
+      return;
+    }
+    const [profileSnap, adminSnap] = await Promise.all([
+      getDoc(doc(db, "users", u.uid)),
+      getDoc(doc(db, "admins", u.uid))
+    ]);
+    setProfile(profileSnap.exists() ? profileSnap.data() : null);
+    setIsAdmin(adminSnap.exists() && adminSnap.data().active === true);
+    setMode("dashboard");
+  }), []);
+
+  async function register(e) {
+    e.preventDefault();
+    setMsg("");
+    try {
+      const c = await createUserWithEmailAndPassword(auth, form.email, form.password);
+      await updateProfile(c.user, { displayName: form.name });
+      await setDoc(doc(db, "users", c.user.uid), {
+        name: form.name,
+        email: form.email,
+        role: "member",
+        plan: "free",
+        questionLimit: 0,
+        questionUsed: 0,
+        status: "active",
+        createdAt: serverTimestamp()
+      });
+      setMsg("สมัครสมาชิกสำเร็จ");
+    } catch (err) { setMsg(err.message); }
+  }
+
+  async function login(e) {
+    e.preventDefault();
+    setMsg("");
+    try { await signInWithEmailAndPassword(auth, form.email, form.password); }
+    catch (err) { setMsg(err.message); }
+  }
+
+  if (mode === "auth") return <Auth {...{form,setForm,register,login,msg}} back={() => setMode("home")} />;
+  if (user && mode === "dashboard") return <Dashboard {...{user,profile,isAdmin}} logout={() => signOut(auth)} home={() => setMode("home")} />;
+
+  return <main className="page"><section className="hero"><div className="logo">⚖</div><p className="eyebrow">NOPPAKAO LAW OFFICE</p><h1>สำนักงานกฎหมายนพเก้า ทนายความ</h1><p className="subtitle">รับว่าความคดีแพ่งและคดีอาญาทั่วราชอาณาจักร</p><p className="description">ให้คำปรึกษา วิเคราะห์ข้อกฎหมาย และดำเนินคดี โดยยึดมั่นในความสุจริตและหลักนิติธรรม</p><div className="actions"><button className="primary">ปรึกษาคดี</button><button className="secondary" onClick={() => setMode(user ? "dashboard" : "auth")}>{user ? "แดชบอร์ด" : "สมัครสมาชิก / เข้าสู่ระบบ"}</button></div></section></main>;
 }
-function Auth({form,setForm,register,login,msg,back}){const [tab,setTab]=useState("register");return <main className="page"><section className="panel auth"><button className="link" onClick={back}>← หน้าแรก</button><h2>{tab==="register"?"สมัครสมาชิก":"เข้าสู่ระบบ"}</h2><form onSubmit={tab==="register"?register:login}>{tab==="register"&&<input required placeholder="ชื่อ-นามสกุล" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>}<input required type="email" placeholder="อีเมล" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/><input required minLength="8" type="password" placeholder="รหัสผ่านอย่างน้อย 8 ตัว" value={form.password} onChange={e=>setForm({...form,password:e.target.value})}/><button className="primary" type="submit">{tab==="register"?"สมัครสมาชิก":"เข้าสู่ระบบ"}</button></form>{msg&&<p className="notice">{msg}</p>}<button className="link" onClick={()=>setTab(tab==="register"?"login":"register")}>{tab==="register"?"มีบัญชีแล้ว เข้าสู่ระบบ":"ยังไม่มีบัญชี สมัครสมาชิก"}</button></section></main>}
-function Dashboard({user,profile,isAdmin,logout,home}){return <main className="dashboard"><aside><div className="brand">⚖ นพเก้า</div><button onClick={home}>หน้าเว็บไซต์</button><button>ข้อมูลสมาชิก</button><button>คำถามปรึกษา</button>{isAdmin&&<><button>จัดการสมาชิก</button><button>การชำระเงิน</button><button>รายงาน</button></>}<button onClick={logout}>ออกจากระบบ</button></aside><section className="content"><p className="eyebrow">{isAdmin?"ADMIN CONTROL CENTER":"MEMBER CENTER"}</p><h2>สวัสดี {profile?.name||user.displayName||user.email}</h2><div className="cards"><Card title="สถานะสมาชิก" value={profile?.plan||"free"}/><Card title="สิทธิคำถาม" value={`${profile?.questionUsed||0} / ${profile?.questionLimit||0}`}/><Card title="สถานะบัญชี" value={profile?.status||"active"}/></div>{isAdmin?<AdminDesign/>:<MemberDesign/>}</section></main>}
-function Card({title,value}){return <div className="card"><span>{title}</span><strong>{value}</strong></div>}
-function MemberDesign(){return <section className="panel"><h3>แดชบอร์ดสมาชิก</h3><p>ระยะถัดไป: ส่งคำถาม ดูประวัติคำปรึกษา และเลือกแพ็กเกจ 99/999 บาท</p></section>}
-function AdminDesign(){return <><section className="panel"><h3>คิวงานผู้ดูแล</h3><div className="adminGrid"><Card title="สมาชิกทั้งหมด" value="เชื่อมข้อมูลภายหลัง"/><Card title="คำถามรอตอบ" value="เชื่อมข้อมูลภายหลัง"/><Card title="ชำระเงินรอตรวจ" value="เชื่อมข้อมูลภายหลัง"/></div></section><section className="panel"><h3>เมนูผู้ดูแลที่ออกแบบไว้</h3><ul><li>ค้นหาและระงับสมาชิก</li><li>ตรวจคำถามและกำหนดสถานะ</li><li>อนุมัติการชำระเงิน</li><li>ปรับแพ็กเกจและสิทธิคำถามผ่านระบบที่เชื่อถือได้</li><li>บันทึกประวัติการดำเนินการของผู้ดูแล</li></ul></section></>}
+
+function Auth({form,setForm,register,login,msg,back}) {
+  const [tab,setTab]=useState("register");
+  return <main className="page"><section className="panel auth"><button className="link" onClick={back}>← หน้าแรก</button><h2>{tab === "register" ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}</h2><form onSubmit={tab === "register" ? register : login}>{tab === "register" && <input required placeholder="ชื่อ-นามสกุล" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>}<input required type="email" placeholder="อีเมล" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/><input required minLength="8" type="password" placeholder="รหัสผ่านอย่างน้อย 8 ตัว" value={form.password} onChange={e=>setForm({...form,password:e.target.value})}/><button className="primary" type="submit">{tab === "register" ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}</button></form>{msg && <p className="notice">{msg}</p>}<button className="link" onClick={()=>setTab(tab === "register" ? "login" : "register")}>{tab === "register" ? "มีบัญชีแล้ว เข้าสู่ระบบ" : "ยังไม่มีบัญชี สมัครสมาชิก"}</button></section></main>;
+}
+
+function Dashboard({user,profile,isAdmin,logout,home}) {
+  return <main className="dashboard"><aside><div className="brand">⚖ นพเก้า</div><button onClick={home}>หน้าเว็บไซต์</button><button>ข้อมูลสมาชิก</button><button>คำถามปรึกษา</button>{isAdmin && <><button>จัดการสมาชิก</button><button>การชำระเงิน</button><button>รายงาน</button></>}<button onClick={logout}>ออกจากระบบ</button></aside><section className="content"><p className="eyebrow">{isAdmin ? "ADMIN CONTROL CENTER" : "MEMBER CENTER"}</p><h2>สวัสดี {profile?.name || user.displayName || user.email}</h2>{isAdmin ? <AdminDashboard/> : <MemberDashboard profile={profile}/>}</section></main>;
+}
+
+function MemberDashboard({profile}) {
+  return <><div className="cards"><Card title="สถานะสมาชิก" value={profile?.plan || "free"}/><Card title="สิทธิคำถาม" value={`${profile?.questionUsed || 0} / ${profile?.questionLimit || 0}`}/><Card title="สถานะบัญชี" value={profile?.status || "active"}/></div><section className="panel"><h3>แดชบอร์ดสมาชิก</h3><p>ระบบส่งคำถามและหักสิทธิจะเพิ่มในขั้นถัดไป</p></section></>;
+}
+
+function AdminDashboard() {
+  const [stats,setStats]=useState({users:0,questions:0,payments:0});
+  const [users,setUsers]=useState([]);
+  const [questions,setQuestions]=useState([]);
+  const [payments,setPayments]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+
+  async function load() {
+    setLoading(true); setError("");
+    try {
+      const [uc,qc,pc,us,qs,ps]=await Promise.all([
+        getCountFromServer(collection(db,"users")),
+        getCountFromServer(collection(db,"questions")),
+        getCountFromServer(collection(db,"payments")),
+        getDocs(query(collection(db,"users"),orderBy("createdAt","desc"),limit(10))),
+        getDocs(query(collection(db,"questions"),orderBy("createdAt","desc"),limit(10))),
+        getDocs(query(collection(db,"payments"),orderBy("createdAt","desc"),limit(10)))
+      ]);
+      setStats({users:uc.data().count,questions:qc.data().count,payments:pc.data().count});
+      setUsers(us.docs.map(d=>({id:d.id,...d.data()})));
+      setQuestions(qs.docs.map(d=>({id:d.id,...d.data()})));
+      setPayments(ps.docs.map(d=>({id:d.id,...d.data()})));
+    } catch(e) { setError(e.message); }
+    setLoading(false);
+  }
+  useEffect(()=>{load();},[]);
+
+  async function setPlan(uid,plan) {
+    const values = plan === "monthly" ? {plan,questionLimit:5,questionUsed:0,status:"active"} : plan === "yearly" ? {plan,questionLimit:60,questionUsed:0,status:"active"} : {plan:"free",questionLimit:0,questionUsed:0,status:"active"};
+    await updateDoc(doc(db,"users",uid),{...values,updatedAt:serverTimestamp()});
+    await load();
+  }
+
+  return <>{error && <p className="notice">{error}</p>}<div className="cards"><Card title="สมาชิกทั้งหมด" value={loading?"...":stats.users}/><Card title="คำถามทั้งหมด" value={loading?"...":stats.questions}/><Card title="การชำระเงินทั้งหมด" value={loading?"...":stats.payments}/></div><section className="panel adminPanel"><div className="sectionHead"><h3>สมาชิกล่าสุด</h3><button className="secondary small" onClick={load}>รีเฟรช</button></div><div className="tableWrap"><table><thead><tr><th>ชื่อ</th><th>อีเมล</th><th>แพ็กเกจ</th><th>สิทธิ</th><th>ดำเนินการ</th></tr></thead><tbody>{users.map(u=><tr key={u.id}><td>{u.name||"-"}</td><td>{u.email||"-"}</td><td>{u.plan||"free"}</td><td>{u.questionUsed||0}/{u.questionLimit||0}</td><td className="rowActions"><button onClick={()=>setPlan(u.id,"free")}>Free</button><button onClick={()=>setPlan(u.id,"monthly")}>Monthly</button><button onClick={()=>setPlan(u.id,"yearly")}>Yearly</button></td></tr>)}</tbody></table></div></section><section className="adminSplit"><div className="panel"><h3>คำถามล่าสุด</h3>{questions.length?questions.map(q=><div className="listItem" key={q.id}><strong>{q.subject||"ไม่มีหัวข้อ"}</strong><span>{q.status||"pending"}</span></div>):<p>ยังไม่มีคำถาม</p>}</div><div className="panel"><h3>การชำระเงินล่าสุด</h3>{payments.length?payments.map(p=><div className="listItem" key={p.id}><strong>{p.plan||"-"}</strong><span>{p.status||"pending"}</span></div>):<p>ยังไม่มีรายการชำระเงิน</p>}</div></section></>;
+}
+
+function Card({title,value}) { return <div className="card"><span>{title}</span><strong>{value}</strong></div>; }
