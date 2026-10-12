@@ -1,27 +1,21 @@
-export default function App() {
-  return (
-    <main className="page">
-      <section className="hero">
-        <div className="logo">⚖</div>
+import {useEffect,useState} from "react";
+import {createUserWithEmailAndPassword,onAuthStateChanged,signInWithEmailAndPassword,signOut,updateProfile} from "firebase/auth";
+import {doc,getDoc,serverTimestamp,setDoc} from "firebase/firestore";
+import {auth,db} from "./lib/firebase";
 
-        <p className="eyebrow">NOPPAKAO LAW OFFICE</p>
-
-        <h1>สำนักงานกฎหมายนพเก้า ทนายความ</h1>
-
-        <p className="subtitle">
-          รับว่าความคดีแพ่งและคดีอาญาทั่วราชอาณาจักร
-        </p>
-
-        <p className="description">
-          ให้คำปรึกษา วิเคราะห์ข้อกฎหมาย และดำเนินคดี
-          โดยยึดมั่นในความสุจริตและหลักนิติธรรม
-        </p>
-
-        <div className="actions">
-          <button className="primary">ปรึกษาคดี</button>
-          <button className="secondary">สมัครสมาชิก</button>
-        </div>
-      </section>
-    </main>
-  );
+const empty={name:"",email:"",password:""};
+export default function App(){
+ const [user,setUser]=useState(null),[profile,setProfile]=useState(null),[mode,setMode]=useState("home"),[form,setForm]=useState(empty),[msg,setMsg]=useState("");
+ useEffect(()=>onAuthStateChanged(auth,async u=>{setUser(u); if(!u){setProfile(null);return;} const s=await getDoc(doc(db,"users",u.uid)); setProfile(s.exists()?s.data():null); setMode("dashboard");}),[]);
+ async function register(e){e.preventDefault();setMsg("");try{const c=await createUserWithEmailAndPassword(auth,form.email,form.password);await updateProfile(c.user,{displayName:form.name});await setDoc(doc(db,"users",c.user.uid),{name:form.name,email:form.email,role:"member",plan:"free",questionLimit:0,questionUsed:0,status:"active",createdAt:serverTimestamp()});setMsg("สมัครสมาชิกสำเร็จ");}catch(err){setMsg(err.message)}}
+ async function login(e){e.preventDefault();setMsg("");try{await signInWithEmailAndPassword(auth,form.email,form.password)}catch(err){setMsg(err.message)}}
+ const isAdmin=profile?.role==="admin";
+ if(mode==="auth") return <Auth form={form} setForm={setForm} register={register} login={login} msg={msg} back={()=>setMode("home")}/>;
+ if(user&&mode==="dashboard") return <Dashboard user={user} profile={profile} isAdmin={isAdmin} logout={()=>signOut(auth)} home={()=>setMode("home")}/>;
+ return <main className="page"><section className="hero"><div className="logo">⚖</div><p className="eyebrow">NOPPAKAO LAW OFFICE</p><h1>สำนักงานกฎหมายนพเก้า ทนายความ</h1><p className="subtitle">รับว่าความคดีแพ่งและคดีอาญาทั่วราชอาณาจักร</p><p className="description">ให้คำปรึกษา วิเคราะห์ข้อกฎหมาย และดำเนินคดี โดยยึดมั่นในความสุจริตและหลักนิติธรรม</p><div className="actions"><button className="primary">ปรึกษาคดี</button><button className="secondary" onClick={()=>setMode(user?"dashboard":"auth")}>{user?"แดชบอร์ด":"สมัครสมาชิก / เข้าสู่ระบบ"}</button></div></section></main>
 }
+function Auth({form,setForm,register,login,msg,back}){const [tab,setTab]=useState("register");return <main className="page"><section className="panel auth"><button className="link" onClick={back}>← หน้าแรก</button><h2>{tab==="register"?"สมัครสมาชิก":"เข้าสู่ระบบ"}</h2><form onSubmit={tab==="register"?register:login}>{tab==="register"&&<input required placeholder="ชื่อ-นามสกุล" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>}<input required type="email" placeholder="อีเมล" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/><input required minLength="8" type="password" placeholder="รหัสผ่านอย่างน้อย 8 ตัว" value={form.password} onChange={e=>setForm({...form,password:e.target.value})}/><button className="primary" type="submit">{tab==="register"?"สมัครสมาชิก":"เข้าสู่ระบบ"}</button></form>{msg&&<p className="notice">{msg}</p>}<button className="link" onClick={()=>setTab(tab==="register"?"login":"register")}>{tab==="register"?"มีบัญชีแล้ว เข้าสู่ระบบ":"ยังไม่มีบัญชี สมัครสมาชิก"}</button></section></main>}
+function Dashboard({user,profile,isAdmin,logout,home}){return <main className="dashboard"><aside><div className="brand">⚖ นพเก้า</div><button onClick={home}>หน้าเว็บไซต์</button><button>ข้อมูลสมาชิก</button><button>คำถามปรึกษา</button>{isAdmin&&<><button>จัดการสมาชิก</button><button>การชำระเงิน</button><button>รายงาน</button></>}<button onClick={logout}>ออกจากระบบ</button></aside><section className="content"><p className="eyebrow">{isAdmin?"ADMIN CONTROL CENTER":"MEMBER CENTER"}</p><h2>สวัสดี {profile?.name||user.displayName||user.email}</h2><div className="cards"><Card title="สถานะสมาชิก" value={profile?.plan||"free"}/><Card title="สิทธิคำถาม" value={`${profile?.questionUsed||0} / ${profile?.questionLimit||0}`}/><Card title="สถานะบัญชี" value={profile?.status||"active"}/></div>{isAdmin?<AdminDesign/>:<MemberDesign/>}</section></main>}
+function Card({title,value}){return <div className="card"><span>{title}</span><strong>{value}</strong></div>}
+function MemberDesign(){return <section className="panel"><h3>แดชบอร์ดสมาชิก</h3><p>ระยะถัดไป: ส่งคำถาม ดูประวัติคำปรึกษา และเลือกแพ็กเกจ 99/999 บาท</p></section>}
+function AdminDesign(){return <><section className="panel"><h3>คิวงานผู้ดูแล</h3><div className="adminGrid"><Card title="สมาชิกทั้งหมด" value="เชื่อมข้อมูลภายหลัง"/><Card title="คำถามรอตอบ" value="เชื่อมข้อมูลภายหลัง"/><Card title="ชำระเงินรอตรวจ" value="เชื่อมข้อมูลภายหลัง"/></div></section><section className="panel"><h3>เมนูผู้ดูแลที่ออกแบบไว้</h3><ul><li>ค้นหาและระงับสมาชิก</li><li>ตรวจคำถามและกำหนดสถานะ</li><li>อนุมัติการชำระเงิน</li><li>ปรับแพ็กเกจและสิทธิคำถามผ่านระบบที่เชื่อถือได้</li><li>บันทึกประวัติการดำเนินการของผู้ดูแล</li></ul></section></>}
