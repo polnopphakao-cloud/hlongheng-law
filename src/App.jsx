@@ -15,6 +15,7 @@ import {
   limit,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
   setDoc,
   updateDoc
@@ -87,11 +88,136 @@ function Auth({form,setForm,register,login,msg,back}) {
 }
 
 function Dashboard({user,profile,isAdmin,logout,home}) {
-  return <main className="dashboard"><aside><div className="brand">⚖ นพเก้า</div><button onClick={home}>หน้าเว็บไซต์</button><button>ข้อมูลสมาชิก</button><button>คำถามปรึกษา</button>{isAdmin && <><button>จัดการสมาชิก</button><button>การชำระเงิน</button><button>รายงาน</button></>}<button onClick={logout}>ออกจากระบบ</button></aside><section className="content"><p className="eyebrow">{isAdmin ? "ADMIN CONTROL CENTER" : "MEMBER CENTER"}</p><h2>สวัสดี {profile?.name || user.displayName || user.email}</h2>{isAdmin ? <AdminDashboard/> : <MemberDashboard profile={profile}/>}</section></main>;
+  return <main className="dashboard"><aside><div className="brand">⚖ นพเก้า</div><button onClick={home}>หน้าเว็บไซต์</button><button>ข้อมูลสมาชิก</button><button>คำถามปรึกษา</button>{isAdmin && <><button>จัดการสมาชิก</button><button>การชำระเงิน</button><button>รายงาน</button></>}<button onClick={logout}>ออกจากระบบ</button></aside><section className="content"><p className="eyebrow">{isAdmin ? "ADMIN CONTROL CENTER" : "MEMBER CENTER"}</p><h2>สวัสดี {profile?.name || user.displayName || user.email}</h2>{isAdmin ? <AdminDashboard/> : <MemberDashboard user={user} profile={profile}/>}</section></main>;
 }
 
-function MemberDashboard({profile}) {
-  return <><div className="cards"><Card title="สถานะสมาชิก" value={profile?.plan || "free"}/><Card title="สิทธิคำถาม" value={`${profile?.questionUsed || 0} / ${profile?.questionLimit || 0}`}/><Card title="สถานะบัญชี" value={profile?.status || "active"}/></div><section className="panel"><h3>แดชบอร์ดสมาชิก</h3><p>ระบบส่งคำถามและหักสิทธิจะเพิ่มในขั้นถัดไป</p></section></>;
+function MemberDashboard({user, profile}) {
+  const [title, setTitle] = useState("");
+  const [detail, setDetail] = useState("");
+  const [sending, setSending] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [used, setUsed] = useState(profile?.questionUsed || 0);
+
+  const limitValue = profile?.questionLimit || 0;
+  const remaining = Math.max(limitValue - used, 0);
+  const canSubmit =
+    profile?.status === "active" &&
+    remaining > 0 &&
+    title.trim().length >= 3 &&
+    detail.trim().length >= 10;
+
+  async function submitQuestion(e) {
+    e.preventDefault();
+    setNotice("");
+
+    if (!user?.uid) {
+      setNotice("ไม่พบข้อมูลผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่");
+      return;
+    }
+
+    try {
+      setSending(true);
+
+      const userRef = doc(db, "users", user.uid);
+      const questionRef = doc(collection(db, "questions"));
+
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+
+        if (!userSnap.exists()) {
+          throw new Error("ไม่พบข้อมูลสมาชิก");
+        }
+
+        const member = userSnap.data();
+        const currentUsed = Number(member.questionUsed || 0);
+        const currentLimit = Number(member.questionLimit || 0);
+
+        if (member.status !== "active") {
+          throw new Error("บัญชีนี้ยังไม่พร้อมใช้งาน");
+        }
+
+        if (currentUsed >= currentLimit) {
+          throw new Error("สิทธิ์คำถามหมดหรือยังไม่ได้รับสิทธิ์");
+        }
+
+        transaction.set(questionRef, {
+          userId: user.uid,
+          userName: member.name || user.displayName || "",
+          userEmail: member.email || user.email || "",
+          subject: title.trim(),
+          detail: detail.trim(),
+          status: "pending",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+
+        transaction.update(userRef, {
+          questionUsed: currentUsed + 1,
+          updatedAt: serverTimestamp()
+        });
+      });
+
+      setUsed((value) => value + 1);
+      setTitle("");
+      setDetail("");
+      setNotice("ส่งคำถามเรียบร้อยแล้ว");
+    } catch (err) {
+      setNotice(err.message || "ไม่สามารถส่งคำถามได้");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="cards">
+        <Card title="สถานะสมาชิก" value={profile?.plan || "free"} />
+        <Card title="สิทธิ์คำถาม" value={`${used} / ${limitValue}`} />
+        <Card title="สิทธิ์คงเหลือ" value={remaining} />
+        <Card title="สถานะบัญชี" value={profile?.status || "active"} />
+      </div>
+
+      <section className="panel">
+        <h3>ส่งคำถามปรึกษา</h3>
+        <p>กรอกหัวข้อและรายละเอียดคำถามให้ครบถ้วน</p>
+
+        <form onSubmit={submitQuestion}>
+          <input
+            required
+            minLength="3"
+            placeholder="หัวข้อคำถาม"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+
+          <textarea
+            required
+            minLength="10"
+            rows="7"
+            placeholder="รายละเอียดคำถาม อย่างน้อย 10 ตัวอักษร"
+            value={detail}
+            onChange={(e) => setDetail(e.target.value)}
+          />
+
+          <button
+            className="primary"
+            type="submit"
+            disabled={!canSubmit || sending}
+          >
+            {sending ? "กำลังส่ง..." : "ส่งคำถาม"}
+          </button>
+        </form>
+
+        {notice && <p className="notice">{notice}</p>}
+
+        {remaining === 0 && (
+          <p className="notice">
+            สิทธิ์คำถามหมดหรือยังไม่ได้รับสิทธิ์ กรุณาติดต่อผู้ดูแล
+          </p>
+        )}
+      </section>
+    </>
+  );
 }
 
 function AdminDashboard() {
