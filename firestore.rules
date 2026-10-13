@@ -1,30 +1,118 @@
 rules_version = '2';
+
 service cloud.firestore {
- match /databases/{database}/documents {
-   function signedIn(){ return request.auth != null; }
-   function admin(){ return signedIn() && request.auth.token.admin == true; }
-   match /users/{uid} {
-     allow create: if signedIn() && request.auth.uid == uid
-       && request.resource.data.role == 'member'
-       && request.resource.data.plan == 'free';
-     allow read: if signedIn() && (request.auth.uid == uid || admin());
-     allow update: if signedIn() && request.auth.uid == uid
-       && request.resource.data.role == resource.data.role
-       && request.resource.data.plan == resource.data.plan
-       && request.resource.data.questionLimit == resource.data.questionLimit
-       && request.resource.data.questionUsed == resource.data.questionUsed;
-     allow update, delete: if admin();
-   }
-   match /questions/{id} {
-     allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-     allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
-     allow update, delete: if admin();
-   }
-   match /payments/{id} {
-     allow create: if signedIn() && request.resource.data.userId == request.auth.uid
-       && request.resource.data.status == 'pending';
-     allow read: if signedIn() && (resource.data.userId == request.auth.uid || admin());
-     allow update, delete: if admin();
-   }
- }
+  match /databases/{database}/documents {
+
+    // ตรวจว่าผู้ใช้เข้าสู่ระบบแล้ว
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // ตรวจว่า UID ที่ร้องขอตรงกับ UID ของเอกสาร
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ตรวจว่ามีเอกสารผู้ดูแลและ active เป็น true
+    function isAdmin() {
+      return isSignedIn()
+        && exists(
+          /databases/$(database)/documents/admins/$(request.auth.uid)
+        )
+        && get(
+          /databases/$(database)/documents/admins/$(request.auth.uid)
+        ).data.active == true;
+    }
+
+    // =========================
+    // ผู้ดูแลระบบ
+    // =========================
+
+    match /admins/{adminUid} {
+
+      // ผู้ดูแลที่ active อ่านรายชื่อผู้ดูแลได้
+      allow read: if isAdmin();
+
+      // ปิดการสร้าง แก้ไข และลบผ่านหน้าเว็บไซต์
+      // ป้องกันผู้ใช้แต่งตั้งตนเองเป็น Admin
+      allow create, update, delete: if false;
+    }
+
+    // =========================
+    // ข้อมูลสมาชิก
+    // =========================
+
+    match /users/{userUid} {
+
+      // เจ้าของบัญชีอ่านข้อมูลตนเองได้
+      // ผู้ดูแลอ่านข้อมูลสมาชิกทุกคนได้
+      allow get: if isOwner(userUid) || isAdmin();
+
+      // การอ่านแบบรายการ สำหรับหน้า Admin Dashboard
+      // อนุญาตเฉพาะผู้ดูแล
+      allow list: if isAdmin();
+
+      // ผู้ใช้สร้างเอกสารของตนเองได้เท่านั้น
+      // และ UID ภายในเอกสารต้องตรงกับผู้เข้าสู่ระบบ
+      allow create: if isOwner(userUid)
+        && request.resource.data.uid == request.auth.uid;
+
+      // ผู้ใช้ทั่วไปแก้เฉพาะข้อมูลพื้นฐานของตนเอง
+      // ห้ามแก้สิทธิ์ บทบาท และสถานะบัญชี
+      allow update: if (
+        isOwner(userUid)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly([
+            'displayName',
+            'photoURL',
+            'updatedAt'
+          ])
+      ) || isAdmin();
+
+      // ผู้ดูแลเท่านั้นที่ลบเอกสารสมาชิกได้
+      // แต่ในทางปฏิบัติแนะนำให้ใช้ suspended แทนการลบ
+      allow delete: if isAdmin();
+    }
+
+    // =========================
+    // ประวัติการแก้สิทธิ์คำถาม
+    // =========================
+
+    match /quotaLogs/{logId} {
+
+      // ผู้ดูแลอ่านและสร้าง Log ได้
+      allow read: if isAdmin();
+
+      allow create: if isAdmin()
+        && request.resource.data.changedBy == request.auth.uid;
+
+      // Log ที่สร้างแล้วห้ามแก้หรือลบ
+      allow update, delete: if false;
+    }
+
+    // =========================
+    // ประวัติกิจกรรมผู้ดูแล
+    // =========================
+
+    match /adminLogs/{logId} {
+
+      // เฉพาะผู้ดูแลอ่านประวัติได้
+      allow read: if isAdmin();
+
+      // ผู้ดูแลสร้างประวัติในชื่อตนเองเท่านั้น
+      allow create: if isAdmin()
+        && request.resource.data.adminUid == request.auth.uid;
+
+      // ป้องกันการแก้หรือลบประวัติย้อนหลัง
+      allow update, delete: if false;
+    }
+
+    // =========================
+    // ปิดเส้นทางอื่นทั้งหมด
+    // =========================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
 }
