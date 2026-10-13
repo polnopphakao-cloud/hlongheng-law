@@ -55,7 +55,6 @@ service cloud.firestore {
       // ผู้ใช้สร้างเอกสารของตนเองได้เท่านั้น
       // และ UID ภายในเอกสารต้องตรงกับผู้เข้าสู่ระบบ
       allow create: if isOwner(userUid)
-        && request.resource.data.uid == request.auth.uid;
 
       // ผู้ใช้ทั่วไปแก้เฉพาะข้อมูลพื้นฐานของตนเอง
       // ห้ามแก้สิทธิ์ บทบาท และสถานะบัญชี
