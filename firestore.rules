@@ -59,14 +59,19 @@ service cloud.firestore {
       // ผู้ใช้ทั่วไปแก้เฉพาะข้อมูลพื้นฐานของตนเอง
       // ห้ามแก้สิทธิ์ บทบาท และสถานะบัญชี
       allow update: if (
-        isOwner(userUid)
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly([
-            'displayName',
-            'photoURL',
-            'updatedAt'
-          ])
-      ) || isAdmin();
+  isOwner(userUid)
+  && request.resource.data.diff(resource.data).affectedKeys()
+    .hasOnly([
+      'displayName',
+      'photoURL',
+      'questionUsed',
+      'updatedAt'
+    ])
+  && request.resource.data.questionUsed
+    == resource.data.questionUsed + 1
+  && request.resource.data.questionUsed
+    <= resource.data.questionLimit
+) || isAdmin();
 
       // ผู้ดูแลเท่านั้นที่ลบเอกสารสมาชิกได้
       // แต่ในทางปฏิบัติแนะนำให้ใช้ suspended แทนการลบ
