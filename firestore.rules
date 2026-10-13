@@ -115,11 +115,32 @@ service cloud.firestore {
 // =========================
 
 match /questions/{questionId} {
-  // ผู้ดูแลที่ active อ่านและแสดงรายการคำถามได้
-  allow read: if isAdmin();
 
-  // ยังไม่อนุญาตให้ Admin แก้หรือลบคำถามในระยะนี้
-  allow create, update, delete: if false;
+  // Admin อ่านคำถามทั้งหมด
+  // สมาชิกอ่านเฉพาะคำถามของตนเอง
+  allow read: if isAdmin()
+    || (
+      isSignedIn()
+      && resource.data.userId == request.auth.uid
+    );
+
+  // สมาชิกสร้างคำถามในชื่อตนเองเท่านั้น
+  allow create: if isSignedIn()
+    && request.resource.data.userId == request.auth.uid
+    && request.resource.data.status == "pending"
+    && request.resource.data.keys().hasOnly([
+      "userId",
+      "userName",
+      "userEmail",
+      "subject",
+      "detail",
+      "status",
+      "createdAt",
+      "updatedAt"
+    ]);
+
+  // ระยะแรกยังไม่ให้แก้หรือลบคำถาม
+  allow update, delete: if false;
 }
 
 // =========================
