@@ -74,7 +74,6 @@ export default function App() {
     setMsg("");
     try {
       await signInWithEmailAndPassword(auth, form.email, form.password);
-      setMode("dashboard");
     } catch (err) {
       setMsg(err.message);
     }
