@@ -4,7 +4,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
-  updateProfile
+  updateProfile,
 } from "firebase/auth";
 import {
   collection,
@@ -18,7 +18,7 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
-  updateDoc
+  updateDoc,
 } from "firebase/firestore";
 import { auth, db } from "./lib/firebase";
 
@@ -32,28 +32,36 @@ export default function App() {
   const [form, setForm] = useState(empty);
   const [msg, setMsg] = useState("");
 
-  useEffect(() => onAuthStateChanged(auth, async (u) => {
-    setUser(u);
-    if (!u) {
-      setProfile(null);
-      setIsAdmin(false);
-      setMode("home");
-      return;
-    }
-    const [profileSnap, adminSnap] = await Promise.all([
-      getDoc(doc(db, "users", u.uid)),
-      getDoc(doc(db, "admins", u.uid))
-    ]);
-    setProfile(profileSnap.exists() ? profileSnap.data() : null);
-    setIsAdmin(adminSnap.exists() && adminSnap.data().active === true);
-    setMode("dashboard");
-  }), []);
+  useEffect(
+    () =>
+      onAuthStateChanged(auth, async (u) => {
+        setUser(u);
+        if (!u) {
+          setProfile(null);
+          setIsAdmin(false);
+          setMode("home");
+          return;
+        }
+        const [profileSnap, adminSnap] = await Promise.all([
+          getDoc(doc(db, "users", u.uid)),
+          getDoc(doc(db, "admins", u.uid)),
+        ]);
+        setProfile(profileSnap.exists() ? profileSnap.data() : null);
+        setIsAdmin(adminSnap.exists() && adminSnap.data().active === true);
+        setMode("dashboard");
+      }),
+    [],
+  );
 
   async function register(e) {
     e.preventDefault();
     setMsg("");
     try {
-      const c = await createUserWithEmailAndPassword(auth, form.email, form.password);
+      const c = await createUserWithEmailAndPassword(
+        auth,
+        form.email,
+        form.password,
+      );
       await updateProfile(c.user, { displayName: form.name });
       await setDoc(doc(db, "users", c.user.uid), {
         name: form.name,
@@ -63,10 +71,12 @@ export default function App() {
         questionLimit: 0,
         questionUsed: 0,
         status: "active",
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
       });
       setMsg("สมัครสมาชิกสำเร็จ");
-    } catch (err) { setMsg(err.message); }
+    } catch (err) {
+      setMsg(err.message);
+    }
   }
 
   async function login(e) {
@@ -79,22 +89,131 @@ export default function App() {
     }
   }
 
-  if (mode === "auth") return <Auth {...{form,setForm,register,login,msg}} back={() => setMode("home")} />;
-  if (user && mode === "dashboard") return <Dashboard {...{user,profile,isAdmin}} logout={() => signOut(auth)} home={() => setMode("home")} />;
+  if (mode === "auth")
+    return (
+      <Auth
+        {...{ form, setForm, register, login, msg }}
+        back={() => setMode("home")}
+      />
+    );
+  if (user && mode === "dashboard")
+    return (
+      <Dashboard
+        {...{ user, profile, isAdmin }}
+        logout={() => signOut(auth)}
+        home={() => setMode("home")}
+      />
+    );
 
-  return <main className="page"><section className="hero"><div className="logo">⚖</div><p className="eyebrow">NOPPAKAO LAW OFFICE</p><h1>สำนักงานกฎหมายนพเก้า ทนายความ</h1><p className="subtitle">รับว่าความคดีแพ่งและคดีอาญาทั่วราชอาณาจักร</p><p className="description">ให้คำปรึกษา วิเคราะห์ข้อกฎหมาย และดำเนินคดี โดยยึดมั่นในความสุจริตและหลักนิติธรรม</p><div className="actions"><button className="primary">ปรึกษาคดี</button><button className="secondary" onClick={() => setMode(user ? "dashboard" : "auth")}>{user ? "แดชบอร์ด" : "สมัครสมาชิก / เข้าสู่ระบบ"}</button></div></section></main>;
+  return (
+    <main className="page">
+      <section className="hero">
+        <div className="logo">⚖</div>
+        <p className="eyebrow">NOPPAKAO LAW OFFICE</p>
+        <h1>สำนักงานกฎหมายนพเก้า ทนายความ</h1>
+        <p className="subtitle">รับว่าความคดีแพ่งและคดีอาญาทั่วราชอาณาจักร</p>
+        <p className="description">
+          ให้คำปรึกษา วิเคราะห์ข้อกฎหมาย และดำเนินคดี
+          โดยยึดมั่นในความสุจริตและหลักนิติธรรม
+        </p>
+        <div className="actions">
+          <button className="primary">ปรึกษาคดี</button>
+          <button
+            className="secondary"
+            onClick={() => setMode(user ? "dashboard" : "auth")}
+          >
+            {user ? "แดชบอร์ด" : "สมัครสมาชิก / เข้าสู่ระบบ"}
+          </button>
+        </div>
+      </section>
+    </main>
+  );
 }
 
-function Auth({form,setForm,register,login,msg,back}) {
-  const [tab,setTab]=useState("register");
-  return <main className="page"><section className="panel auth"><button className="link" onClick={back}>← หน้าแรก</button><h2>{tab === "register" ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}</h2><form onSubmit={tab === "register" ? register : login}>{tab === "register" && <input required placeholder="ชื่อ-นามสกุล" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>}<input required type="email" placeholder="อีเมล" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/><input required minLength="8" type="password" placeholder="รหัสผ่านอย่างน้อย 8 ตัว" value={form.password} onChange={e=>setForm({...form,password:e.target.value})}/><button className="primary" type="submit">{tab === "register" ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}</button></form>{msg && <p className="notice">{msg}</p>}<button className="link" onClick={()=>setTab(tab === "register" ? "login" : "register")}>{tab === "register" ? "มีบัญชีแล้ว เข้าสู่ระบบ" : "ยังไม่มีบัญชี สมัครสมาชิก"}</button></section></main>;
+function Auth({ form, setForm, register, login, msg, back }) {
+  const [tab, setTab] = useState("register");
+  return (
+    <main className="page">
+      <section className="panel auth">
+        <button className="link" onClick={back}>
+          ← หน้าแรก
+        </button>
+        <h2>{tab === "register" ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}</h2>
+        <form onSubmit={tab === "register" ? register : login}>
+          {tab === "register" && (
+            <input
+              required
+              placeholder="ชื่อ-นามสกุล"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          )}
+          <input
+            required
+            type="email"
+            placeholder="อีเมล"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+          />
+          <input
+            required
+            minLength="8"
+            type="password"
+            placeholder="รหัสผ่านอย่างน้อย 8 ตัว"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+          />
+          <button className="primary" type="submit">
+            {tab === "register" ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}
+          </button>
+        </form>
+        {msg && <p className="notice">{msg}</p>}
+        <button
+          className="link"
+          onClick={() => setTab(tab === "register" ? "login" : "register")}
+        >
+          {tab === "register"
+            ? "มีบัญชีแล้ว เข้าสู่ระบบ"
+            : "ยังไม่มีบัญชี สมัครสมาชิก"}
+        </button>
+      </section>
+    </main>
+  );
 }
 
-function Dashboard({user,profile,isAdmin,logout,home}) {
-  return <main className="dashboard"><aside><div className="brand">⚖ นพเก้า</div><button onClick={home}>หน้าเว็บไซต์</button><button>ข้อมูลสมาชิก</button><button>คำถามปรึกษา</button>{isAdmin && <><button>จัดการสมาชิก</button><button>การชำระเงิน</button><button>รายงาน</button></>}<button onClick={logout}>ออกจากระบบ</button></aside><section className="content"><p className="eyebrow">{isAdmin ? "ADMIN CONTROL CENTER" : "MEMBER CENTER"}</p><h2>สวัสดี {profile?.name || user.displayName || user.email}</h2>{isAdmin ? <AdminDashboard/> : <MemberDashboard user={user} profile={profile}/>}</section></main>;
+function Dashboard({ user, profile, isAdmin, logout, home }) {
+  return (
+    <main className="dashboard">
+      <aside>
+        <div className="brand">⚖ นพเก้า</div>
+        <button onClick={home}>หน้าเว็บไซต์</button>
+        <button>ข้อมูลสมาชิก</button>
+        <button>คำถามปรึกษา</button>
+        {isAdmin && (
+          <>
+            <button>จัดการสมาชิก</button>
+            <button>การชำระเงิน</button>
+            <button>รายงาน</button>
+          </>
+        )}
+        <button onClick={logout}>ออกจากระบบ</button>
+      </aside>
+      <section className="content">
+        <p className="eyebrow">
+          {isAdmin ? "ADMIN CONTROL CENTER" : "MEMBER CENTER"}
+        </p>
+        <h2>สวัสดี {profile?.name || user.displayName || user.email}</h2>
+        {isAdmin ? (
+          <AdminDashboard />
+        ) : (
+          <MemberDashboard user={user} profile={profile} />
+        )}
+      </section>
+    </main>
+  );
 }
 
-function MemberDashboard({user, profile}) {
+function MemberDashboard({ user, profile }) {
   const [title, setTitle] = useState("");
   const [detail, setDetail] = useState("");
   const [sending, setSending] = useState(false);
@@ -151,12 +270,12 @@ function MemberDashboard({user, profile}) {
           detail: detail.trim(),
           status: "pending",
           createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
         });
 
         transaction.update(userRef, {
           questionUsed: currentUsed + 1,
-          updatedAt: serverTimestamp()
+          updatedAt: serverTimestamp(),
         });
       });
 
@@ -224,49 +343,205 @@ function MemberDashboard({user, profile}) {
 }
 
 function AdminDashboard() {
-  const [stats,setStats]=useState({users:0,questions:0,payments:0});
-  const [users,setUsers]=useState([]);
-  const [questions,setQuestions]=useState([]);
-  const [payments,setPayments]=useState([]);
-  const [loading,setLoading]=useState(true);
-  const [error,setError]=useState("");
+  const [stats, setStats] = useState({ users: 0, questions: 0, payments: 0 });
+  const [users, setUsers] = useState([]);
+  const [questions, setQuestions] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedQuestion, setSelectedQuestion] = useState(null);
+  const [answerText, setAnswerText] = useState("");
+  const [savingAnswer, setSavingAnswer] = useState(false);
 
   async function load() {
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     try {
-      const [uc,qc,pc,us,qs,ps]=await Promise.all([
-        getCountFromServer(collection(db,"users")),
-        getCountFromServer(collection(db,"questions")),
-        getCountFromServer(collection(db,"payments")),
-        getDocs(query(collection(db,"users"),orderBy("createdAt","desc"),limit(10))),
-        getDocs(query(collection(db,"questions"),orderBy("createdAt","desc"),limit(10))),
-        getDocs(query(collection(db,"payments"),orderBy("createdAt","desc"),limit(10)))
+      const [uc, qc, pc, us, qs, ps] = await Promise.all([
+        getCountFromServer(collection(db, "users")),
+        getCountFromServer(collection(db, "questions")),
+        getCountFromServer(collection(db, "payments")),
+        getDocs(
+          query(
+            collection(db, "users"),
+            orderBy("createdAt", "desc"),
+            limit(10),
+          ),
+        ),
+        getDocs(
+          query(
+            collection(db, "questions"),
+            orderBy("createdAt", "desc"),
+            limit(10),
+          ),
+        ),
+        getDocs(
+          query(
+            collection(db, "payments"),
+            orderBy("createdAt", "desc"),
+            limit(10),
+          ),
+        ),
       ]);
-      setStats({users:uc.data().count,questions:qc.data().count,payments:pc.data().count});
-      setUsers(us.docs.map(d=>({id:d.id,...d.data()})));
-      setQuestions(qs.docs.map(d=>({id:d.id,...d.data()})));
-      setPayments(ps.docs.map(d=>({id:d.id,...d.data()})));
-    } catch(e) { setError(e.message); }
+      setStats({
+        users: uc.data().count,
+        questions: qc.data().count,
+        payments: pc.data().count,
+      });
+      setUsers(us.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setQuestions(qs.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setPayments(ps.docs.map((d) => ({ id: d.id, ...d.data() })));
+    } catch (e) {
+      setError(e.message);
+    }
     setLoading(false);
   }
-  useEffect(()=>{load();},[]);
+  useEffect(() => {
+    load();
+  }, []);
 
-  async function setPlan(uid,plan) {
-    const values = plan === "monthly" ? {plan,questionLimit:5,questionUsed:0,status:"active"} : plan === "yearly" ? {plan,questionLimit:60,questionUsed:0,status:"active"} : {plan:"free",questionLimit:0,questionUsed:0,status:"active"};
-    await updateDoc(doc(db,"users",uid),{...values,updatedAt:serverTimestamp()});
+  async function setPlan(uid, plan) {
+    const values =
+      plan === "monthly"
+        ? { plan, questionLimit: 5, questionUsed: 0, status: "active" }
+        : plan === "yearly"
+          ? { plan, questionLimit: 60, questionUsed: 0, status: "active" }
+          : {
+              plan: "free",
+              questionLimit: 0,
+              questionUsed: 0,
+              status: "active",
+            };
+    await updateDoc(doc(db, "users", uid), {
+      ...values,
+      updatedAt: serverTimestamp(),
+    });
     await load();
   }
 
-  return <>{error && <p className="notice">{error}</p>}<div className="cards"><Card title="สมาชิกทั้งหมด" value={loading?"...":stats.users}/><Card title="คำถามทั้งหมด" value={loading?"...":stats.questions}/><Card title="การชำระเงินทั้งหมด" value={loading?"...":stats.payments}/></div><section className="panel adminPanel"><div className="sectionHead"><h3>สมาชิกล่าสุด</h3><button className="secondary small" onClick={load}>รีเฟรช</button></div><div className="tableWrap"><table><thead><tr><th>ชื่อ</th><th>อีเมล</th><th>แพ็กเกจ</th><th>สิทธิ</th><th>ดำเนินการ</th></tr></thead><tbody>{users.map(u=><tr key={u.id}><td>{u.name||"-"}</td><td>{u.email||"-"}</td><td>{u.plan||"free"}</td><td>{u.questionUsed||0}/{u.questionLimit||0}</td><td className="rowActions"><button onClick={()=>setPlan(u.id,"free")}>Free</button><button onClick={()=>setPlan(u.id,"monthly")}>Monthly</button><button onClick={()=>setPlan(u.id,"yearly")}>Yearly</button></td></tr>)}</tbody></table></div></section><section className="adminSplit"><div className="panel"><h3>คำถามล่าสุด</h3>{questions.length?questions.map(q=><div className="listItem questionItem" key={q.id}>
-  <div>
-    <strong>{q.subject || "ไม่มีหัวข้อ"}</strong>
-    <p>{q.detail || "ไม่มีรายละเอียดคำถาม"}</p>
-    <small>
-      ผู้ส่ง: {q.userName || "-"} | {q.userEmail || "-"}
-    </small>
-  </div>
-  <span>{q.status || "pending"}</span>
-</div>):<p>ยังไม่มีคำถาม</p>}</div><div className="panel"><h3>การชำระเงินล่าสุด</h3>{payments.length?payments.map(p=><div className="listItem" key={p.id}><strong>{p.plan||"-"}</strong><span>{p.status||"pending"}</span></div>):<p>ยังไม่มีรายการชำระเงิน</p>}</div></section></>;
+  async function saveAnswer() {
+    if (!selectedQuestion || !answerText.trim()) return;
+    setSavingAnswer(true);
+    setError("");
+    try {
+      await updateDoc(doc(db, "questions", selectedQuestion.id), {
+        answer: answerText.trim(),
+        status: "answered",
+        answeredAt: serverTimestamp(),
+      });
+      setSelectedQuestion(null);
+      setAnswerText("");
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSavingAnswer(false);
+    }
+  }
+
+  return (
+    <>
+      {error && <p className="notice">{error}</p>}
+      <div className="cards">
+        <Card title="สมาชิกทั้งหมด" value={loading ? "..." : stats.users} />
+        <Card title="คำถามทั้งหมด" value={loading ? "..." : stats.questions} />
+        <Card
+          title="การชำระเงินทั้งหมด"
+          value={loading ? "..." : stats.payments}
+        />
+      </div>
+      <section className="panel adminPanel">
+        <div className="sectionHead">
+          <h3>สมาชิกล่าสุด</h3>
+          <button className="secondary small" onClick={load}>
+            รีเฟรช
+          </button>
+        </div>
+        <div className="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ชื่อ</th>
+                <th>อีเมล</th>
+                <th>แพ็กเกจ</th>
+                <th>สิทธิ</th>
+                <th>ดำเนินการ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id}>
+                  <td>{u.name || "-"}</td>
+                  <td>{u.email || "-"}</td>
+                  <td>{u.plan || "free"}</td>
+                  <td>
+                    {u.questionUsed || 0}/{u.questionLimit || 0}
+                  </td>
+                  <td className="rowActions">
+                    <button onClick={() => setPlan(u.id, "free")}>Free</button>
+                    <button onClick={() => setPlan(u.id, "monthly")}>
+                      Monthly
+                    </button>
+                    <button onClick={() => setPlan(u.id, "yearly")}>
+                      Yearly
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section className="adminSplit">
+        <div className="panel">
+          <h3>คำถามล่าสุด</h3>
+          {questions.length ? (
+            questions.map((q) => (
+              <div className="listItem questionItem" key={q.id}>
+                <div>
+                  <strong>{q.subject || "ไม่มีหัวข้อ"}</strong>
+                  <p>{q.detail || "ไม่มีรายละเอียดคำถาม"}</p>
+                  <small>
+                    ผู้ส่ง: {q.userName || "-"} | {q.userEmail || "-"}
+                  </small>
+                </div>
+                <div>
+              <span>{q.status || "pending"}</span>
+              <button className="secondary small" onClick={() => { setSelectedQuestion(q); setAnswerText(q.answer || ""); }}>
+                ตอบคำถาม
+              </button>
+            </div>
+              </div>
+            ))
+          ) : (
+            <p>ยังไม่มีคำถาม</p>
+          )}
+        </div>
+        
+      {selectedQuestion && (<div className="panel"><h3>ตอบคำถาม</h3><p><strong>{selectedQuestion.subject || "ไม่มีหัวข้อ"}</strong></p><p>{selectedQuestion.detail || "ไม่มีรายละเอียดคำถาม"}</p><textarea rows="8" value={answerText} onChange={(e) => setAnswerText(e.target.value)} placeholder="พิมพ์คำตอบที่นี่" /><div className="actions"><button className="primary" onClick={saveAnswer} disabled={savingAnswer || !answerText.trim()}>{savingAnswer ? "กำลังบันทึก..." : "บันทึกคำตอบ"}</button><button className="secondary" onClick={() => { setSelectedQuestion(null); setAnswerText(""); }}>ยกเลิก</button></div></div>)}
+        <div className="panel">
+          <h3>การชำระเงินล่าสุด</h3>
+          {payments.length ? (
+            payments.map((p) => (
+              <div className="listItem" key={p.id}>
+                <strong>{p.plan || "-"}</strong>
+                <span>{p.status || "pending"}</span>
+              </div>
+            ))
+          ) : (
+            <p>ยังไม่มีรายการชำระเงิน</p>
+          )}
+        </div>
+      </section>
+    </>
+  );
 }
 
-function Card({title,value}) { return <div className="card"><span>{title}</span><strong>{value}</strong></div>; }
+function Card({ title, value }) {
+  return (
+    <div className="card">
+      <span>{title}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
