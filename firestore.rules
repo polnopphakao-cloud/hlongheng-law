@@ -28,15 +28,18 @@ service cloud.firestore {
     // ผู้ดูแลระบบ
     // =========================
 
-    match /admins/{adminUid} {
+match /admins/{adminUid} {
 
-      // ผู้ดูแลที่ active อ่านรายชื่อผู้ดูแลได้
-      allow read: if isAdmin();
+  // ผู้ใช้ตรวจได้เฉพาะเอกสาร Admin ที่มี UID ของตนเอง
+  // ผู้ดูแลอ่านเอกสาร Admin ได้
+  allow get: if isOwner(adminUid) || isAdmin();
 
-      // ปิดการสร้าง แก้ไข และลบผ่านหน้าเว็บไซต์
-      // ป้องกันผู้ใช้แต่งตั้งตนเองเป็น Admin
-      allow create, update, delete: if false;
-    }
+  // การอ่านรายชื่อ Admin ทั้ง collection ให้เฉพาะ Admin
+  allow list: if isAdmin();
+
+  // ห้ามสร้าง แก้ หรือลบผ่านหน้าเว็บไซต์
+  allow create, update, delete: if false;
+}
 
     // =========================
     // ข้อมูลสมาชิก
