@@ -19,6 +19,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  onSnapshot,
 } from "firebase/firestore";
 import { auth, db } from "./lib/firebase";
 
@@ -352,6 +353,19 @@ function AdminDashboard() {
   const [selectedQuestion, setSelectedQuestion] = useState(null);
   const [answerText, setAnswerText] = useState("");
   const [savingAnswer, setSavingAnswer] = useState(false);
+  const [newQuestionCount, setNewQuestionCount] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, "questions"),
+      (snapshot) => {
+        const pendingCount = snapshot.docs.filter((item) => (item.data().status || "pending") === "pending").length;
+        setNewQuestionCount(pendingCount);
+      },
+      (snapshotError) => setError(snapshotError.message)
+    );
+    return () => unsubscribe();
+  }, []);
 
   async function load() {
     setLoading(true);
@@ -494,7 +508,7 @@ function AdminDashboard() {
       </section>
       <section className="adminSplit">
         <div className="panel">
-          <h3>คำถามล่าสุด</h3>
+          <h3>คำถามล่าสุด {newQuestionCount > 0 && <span style={{ color: "#ff4d4f", marginLeft: "10px" }}>คำถามใหม่ {newQuestionCount}</span>}</h3>
           {questions.length ? (
             questions.map((q) => (
               <div className="listItem questionItem" key={q.id}>
