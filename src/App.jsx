@@ -72,8 +72,12 @@ export default function App() {
   async function login(e) {
     e.preventDefault();
     setMsg("");
-    try { await signInWithEmailAndPassword(auth, form.email, form.password); }
-    catch (err) { setMsg(err.message); }
+    try {
+      await signInWithEmailAndPassword(auth, form.email, form.password);
+      setMode("dashboard");
+    } catch (err) {
+      setMsg(err.message);
+    }
   }
 
   if (mode === "auth") return <Auth {...{form,setForm,register,login,msg}} back={() => setMode("home")} />;
