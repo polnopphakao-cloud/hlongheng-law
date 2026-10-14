@@ -257,7 +257,16 @@ function AdminDashboard() {
     await load();
   }
 
-  return <>{error && <p className="notice">{error}</p>}<div className="cards"><Card title="สมาชิกทั้งหมด" value={loading?"...":stats.users}/><Card title="คำถามทั้งหมด" value={loading?"...":stats.questions}/><Card title="การชำระเงินทั้งหมด" value={loading?"...":stats.payments}/></div><section className="panel adminPanel"><div className="sectionHead"><h3>สมาชิกล่าสุด</h3><button className="secondary small" onClick={load}>รีเฟรช</button></div><div className="tableWrap"><table><thead><tr><th>ชื่อ</th><th>อีเมล</th><th>แพ็กเกจ</th><th>สิทธิ</th><th>ดำเนินการ</th></tr></thead><tbody>{users.map(u=><tr key={u.id}><td>{u.name||"-"}</td><td>{u.email||"-"}</td><td>{u.plan||"free"}</td><td>{u.questionUsed||0}/{u.questionLimit||0}</td><td className="rowActions"><button onClick={()=>setPlan(u.id,"free")}>Free</button><button onClick={()=>setPlan(u.id,"monthly")}>Monthly</button><button onClick={()=>setPlan(u.id,"yearly")}>Yearly</button></td></tr>)}</tbody></table></div></section><section className="adminSplit"><div className="panel"><h3>คำถามล่าสุด</h3>{questions.length?questions.map(q=><div className="listItem" key={q.id}><strong>{q.subject||"ไม่มีหัวข้อ"}</strong><span>{q.status||"pending"}</span></div>):<p>ยังไม่มีคำถาม</p>}</div><div className="panel"><h3>การชำระเงินล่าสุด</h3>{payments.length?payments.map(p=><div className="listItem" key={p.id}><strong>{p.plan||"-"}</strong><span>{p.status||"pending"}</span></div>):<p>ยังไม่มีรายการชำระเงิน</p>}</div></section></>;
+  return <>{error && <p className="notice">{error}</p>}<div className="cards"><Card title="สมาชิกทั้งหมด" value={loading?"...":stats.users}/><Card title="คำถามทั้งหมด" value={loading?"...":stats.questions}/><Card title="การชำระเงินทั้งหมด" value={loading?"...":stats.payments}/></div><section className="panel adminPanel"><div className="sectionHead"><h3>สมาชิกล่าสุด</h3><button className="secondary small" onClick={load}>รีเฟรช</button></div><div className="tableWrap"><table><thead><tr><th>ชื่อ</th><th>อีเมล</th><th>แพ็กเกจ</th><th>สิทธิ</th><th>ดำเนินการ</th></tr></thead><tbody>{users.map(u=><tr key={u.id}><td>{u.name||"-"}</td><td>{u.email||"-"}</td><td>{u.plan||"free"}</td><td>{u.questionUsed||0}/{u.questionLimit||0}</td><td className="rowActions"><button onClick={()=>setPlan(u.id,"free")}>Free</button><button onClick={()=>setPlan(u.id,"monthly")}>Monthly</button><button onClick={()=>setPlan(u.id,"yearly")}>Yearly</button></td></tr>)}</tbody></table></div></section><section className="adminSplit"><div className="panel"><h3>คำถามล่าสุด</h3>{questions.length?questions.map(q=><div className="listItem questionItem" key={q.id}>
+  <div>
+    <strong>{q.subject || "ไม่มีหัวข้อ"}</strong>
+    <p>{q.detail || "ไม่มีรายละเอียดคำถาม"}</p>
+    <small>
+      ผู้ส่ง: {q.userName || "-"} | {q.userEmail || "-"}
+    </small>
+  </div>
+  <span>{q.status || "pending"}</span>
+</div>):<p>ยังไม่มีคำถาม</p>}</div><div className="panel"><h3>การชำระเงินล่าสุด</h3>{payments.length?payments.map(p=><div className="listItem" key={p.id}><strong>{p.plan||"-"}</strong><span>{p.status||"pending"}</span></div>):<p>ยังไม่มีรายการชำระเงิน</p>}</div></section></>;
 }
 
 function Card({title,value}) { return <div className="card"><span>{title}</span><strong>{value}</strong></div>; }
