@@ -94,7 +94,8 @@ match /admins/{adminUid} {
         && request.resource.data.changedBy == request.auth.uid;
 
       // Log ที่สร้างแล้วห้ามแก้หรือลบ
-      allow update, delete: if false;
+      allow update: if isAdmin();
+    allow delete: if false;
     }
 
     // =========================
@@ -143,7 +144,8 @@ match /questions/{questionId} {
     ]);
 
   // ระยะแรกยังไม่ให้แก้หรือลบคำถาม
-  allow update, delete: if false;
+  allow update: if isAdmin();
+    allow delete: if false;
 }
 
 // =========================
@@ -155,11 +157,31 @@ match /payments/{paymentId} {
   allow read: if isAdmin();
 
   // ยังไม่อนุญาตให้แก้ไขหรือลบผ่านหน้าเว็บไซต์
-  allow create, update, delete: if false;
+  allow create: if request.auth != null
+      && request.resource.data.userId == request.auth.uid
+      && request.resource.data.status == "pending"
+      && request.resource.data.amount > 0
+      && request.resource.data.plan in ["monthly", "yearly"];
+    allow update: if isAdmin();
+    allow delete: if false;
 }
     // =========================
     // ปิดเส้นทางอื่นทั้งหมด
     // =========================
+
+    match /appointments/{appointmentId} {
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == "pending"
+        && request.resource.data.keys().hasOnly([
+          "userId", "userName", "userEmail", "caseType",
+          "appointDate", "appointTime", "status", "createdAt"
+        ]);
+      allow read: if request.auth != null
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isAdmin();
+      allow delete: if false;
+    }
 
     match /{document=**} {
       allow read, write: if false;
