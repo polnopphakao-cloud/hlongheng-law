@@ -16,6 +16,7 @@ import {
   limit,
   orderBy,
   query,
+ where,
   runTransaction,
   serverTimestamp,
   setDoc,
@@ -229,7 +230,30 @@ function MemberDashboard({ user, profile }) {
   const [paymentNotice, setPaymentNotice] = useState("");
   const [appointment, setAppointment] = useState({ caseType: "คดีมรดก", appointDate: "", appointTime: "" });
   const [appointmentNotice, setAppointmentNotice] = useState("");
+ const [memberAppointments, setMemberAppointments] = useState([]);
   const [sendingAppointment, setSendingAppointment] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadMemberAppointments() {
+      try {
+        const appointmentSnap = await getDocs(
+          query(collection(db, "appointments"), where("userId", "==", user.uid))
+        );
+        if (active) {
+          setMemberAppointments(
+            appointmentSnap.docs.map((item) => ({ id: item.id, ...item.data() }))
+          );
+        }
+      } catch (e) {
+        if (active) setAppointmentNotice(e.message);
+      }
+    }
+
+    if (user?.uid) loadMemberAppointments();
+    return () => { active = false; };
+  }, [user?.uid]);
 
   const limitValue = profile?.questionLimit || 0;
   const remaining = Math.max(limitValue - used, 0);
@@ -469,6 +493,24 @@ function MemberDashboard({ user, profile }) {
   </form>
   {appointmentNotice && <p className="notice">{appointmentNotice}</p>}
 </section>
+      <section className="card">
+        <h3>ประวัตินัดหมายของฉัน</h3>
+        <div className="list">
+          {memberAppointments.length ? (
+            memberAppointments.map((appointmentItem) => (
+              <div className="listItem" key={appointmentItem.id}>
+                <div>
+                  <strong>{appointmentItem.caseType || "ไม่ระบุประเภทคดี"}</strong>
+                  <p>{appointmentItem.appointDate || "ไม่ระบุวันที่"} {appointmentItem.appointTime || ""}</p>
+                </div>
+                <span>{appointmentItem.status || "pending"}</span>
+              </div>
+            ))
+          ) : (
+            <p>ยังไม่มีประวัตินัดหมาย</p>
+          )}
+        </div>
+      </section>
     </>
   );
 }
