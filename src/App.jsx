@@ -8,6 +8,7 @@ import {
 } from "firebase/auth";
 import {
   collection,
+  addDoc,
   doc,
   getCountFromServer,
   getDoc,
@@ -220,6 +221,15 @@ function MemberDashboard({ user, profile }) {
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState("");
   const [used, setUsed] = useState(profile?.questionUsed || 0);
+  const [paymentPlan, setPaymentPlan] = useState("monthly");
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentDateTime, setPaymentDateTime] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [sendingPayment, setSendingPayment] = useState(false);
+  const [paymentNotice, setPaymentNotice] = useState("");
+  const [appointment, setAppointment] = useState({ caseType: "คดีมรดก", appointDate: "", appointTime: "" });
+  const [appointmentNotice, setAppointmentNotice] = useState("");
+  const [sendingAppointment, setSendingAppointment] = useState(false);
 
   const limitValue = profile?.questionLimit || 0;
   const remaining = Math.max(limitValue - used, 0);
@@ -291,6 +301,79 @@ function MemberDashboard({ user, profile }) {
     }
   }
 
+  async function submitPayment(e) {
+    e.preventDefault();
+    setPaymentNotice("");
+
+    const amount = Number(paymentAmount);
+    if (!amount || amount <= 0 || !paymentDateTime || !paymentReference.trim()) {
+      setPaymentNotice("กรุณากรอกข้อมูลการชำระเงินให้ครบ");
+      return;
+    }
+
+    setSendingPayment(true);
+    try {
+      const paymentRef = doc(collection(db, "payments"));
+      await setDoc(paymentRef, {
+        userId: user.uid,
+        userName: profile?.name || user.displayName || "",
+        userEmail: profile?.email || user.email || "",
+        plan: paymentPlan,
+        amount,
+        paidAt: paymentDateTime,
+        reference: paymentReference.trim(),
+        status: "pending",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      setPaymentAmount("");
+      setPaymentDateTime("");
+      setPaymentReference("");
+      setPaymentNotice("แจ้งชำระเงินเรียบร้อยแล้ว รอผู้ดูแลตรวจสอบ");
+    } catch (error) {
+      setPaymentNotice(error.message);
+    } finally {
+      setSendingPayment(false);
+    }
+  }
+
+    async function submitAppointment(e) {
+    e.preventDefault();
+    setAppointmentNotice("");
+
+    if (!appointment.appointDate || !appointment.appointTime) {
+      setAppointmentNotice("กรุณาเลือกวันและเวลานัดหมาย");
+      return;
+    }
+
+    setSendingAppointment(true);
+
+    try {
+      await addDoc(collection(db, "appointments"), {
+        userId: user.uid,
+        userName: profile?.name || user.displayName || "",
+        userEmail: profile?.email || user.email || "",
+        caseType: appointment.caseType,
+        appointDate: appointment.appointDate,
+        appointTime: appointment.appointTime,
+        status: "pending",
+        createdAt: serverTimestamp(),
+      });
+
+      setAppointment({
+        caseType: "คดีมรดก",
+        appointDate: "",
+        appointTime: "",
+      });
+
+      setAppointmentNotice("ส่งคำขอนัดหมายเรียบร้อยแล้ว");
+    } catch (error) {
+      setAppointmentNotice(error.message);
+    } finally {
+      setSendingAppointment(false);
+    }
+  }
   return (
     <>
       <div className="cards">
@@ -339,6 +422,53 @@ function MemberDashboard({ user, profile }) {
           </p>
         )}
       </section>
+      <section className="card">
+        <h3>แจ้งชำระเงิน</h3>
+        <form onSubmit={submitPayment}>
+          <select value={paymentPlan} onChange={(e) => setPaymentPlan(e.target.value)}>
+            <option value="monthly">รายเดือน</option>
+            <option value="yearly">รายปี</option>
+          </select>
+          <input type="number" min="1" step="0.01" required placeholder="จำนวนเงิน (บาท)" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} />
+          <input type="datetime-local" required value={paymentDateTime} onChange={(e) => setPaymentDateTime(e.target.value)} />
+          <input type="text" required placeholder="เลขอ้างอิงรายการโอน" value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} />
+          <button className="primary" type="submit" disabled={sendingPayment}>{sendingPayment ? "กำลังส่ง..." : "แจ้งชำระเงิน"}</button>
+        </form>
+        {paymentNotice && <p className="notice">{paymentNotice}</p>}
+      </section>
+<section className="card">
+  <h3>นัดหมายทนาย</h3>
+  <form onSubmit={submitAppointment}>
+    <select
+      value={appointment.caseType}
+      onChange={(e) => setAppointment({ ...appointment, caseType: e.target.value })}
+    >
+      <option value="คดีมรดก">คดีมรดก</option>
+      <option value="คดีที่ดิน">คดีที่ดิน</option>
+      <option value="คดีแพ่ง">คดีแพ่ง</option>
+      <option value="คดีอาญา">คดีอาญา</option>
+    </select>
+
+    <input
+      type="date"
+      value={appointment.appointDate}
+      onChange={(e) => setAppointment({ ...appointment, appointDate: e.target.value })}
+      required
+    />
+
+    <input
+      type="time"
+      value={appointment.appointTime}
+      onChange={(e) => setAppointment({ ...appointment, appointTime: e.target.value })}
+      required
+    />
+
+    <button type="submit" disabled={sendingAppointment}>
+      {sendingAppointment ? "กำลังส่ง..." : "ส่งคำขอนัดหมาย"}
+    </button>
+  </form>
+  {appointmentNotice && <p className="notice">{appointmentNotice}</p>}
+</section>
     </>
   );
 }
@@ -431,6 +561,57 @@ function AdminDashboard() {
       updatedAt: serverTimestamp(),
     });
     await load();
+  }
+
+  async function approvePayment(payment) {
+    if (!payment || payment.status !== "pending") return;
+
+    const values =
+      payment.plan === "monthly"
+        ? { plan: "monthly", questionLimit: 5, questionUsed: 0, status: "active" }
+        : payment.plan === "yearly"
+        ? { plan: "yearly", questionLimit: 60, questionUsed: 0, status: "active" }
+        : null;
+
+    if (!values) {
+      setError("แพ็กเกจการชำระเงินไม่ถูกต้อง");
+      return;
+    }
+
+    setError("");
+    try {
+      await updateDoc(doc(db, "users", payment.userId), {
+        ...values,
+        updatedAt: serverTimestamp(),
+      });
+
+      await updateDoc(doc(db, "payments", payment.id), {
+        status: "approved",
+        approvedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function rejectPayment(payment) {
+    if (!payment || payment.status !== "pending") return;
+
+    setError("");
+    try {
+      await updateDoc(doc(db, "payments", payment.id), {
+        status: "rejected",
+        rejectedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
   }
 
   async function saveAnswer() {
@@ -536,12 +717,30 @@ function AdminDashboard() {
         <div className="panel">
           <h3>การชำระเงินล่าสุด</h3>
           {payments.length ? (
-            payments.map((p) => (
-              <div className="listItem" key={p.id}>
-                <strong>{p.plan || "-"}</strong>
-                <span>{p.status || "pending"}</span>
+          payments.map((p) => (
+            <div className="listItem" key={p.id}>
+              <div>
+                <strong>{p.userName || p.userEmail || "ไม่ระบุสมาชิก"}</strong>
+                <p>แพ็กเกจ: {p.plan || "-"}</p>
+                <p>จำนวนเงิน: {p.amount || 0} บาท</p>
+                <p>วันเวลาโอน: {p.paidAt || "-"}</p>
+                <p>เลขอ้างอิง: {p.reference || "-"}</p>
               </div>
-            ))
+              <div>
+                <span>{p.status || "pending"}</span>
+                {(p.status || "pending") === "pending" && (
+                  <div className="actions">
+                    <button className="primary" onClick={() => approvePayment(p)}>
+                      อนุมัติ
+                    </button>
+                    <button className="secondary" onClick={() => rejectPayment(p)}>
+                      ปฏิเสธ
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))
           ) : (
             <p>ยังไม่มีรายการชำระเงิน</p>
           )}
