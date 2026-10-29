@@ -637,6 +637,21 @@ function AdminDashboard() {
     }
   }
 
+  async function confirmAppointment(appointmentItem) {
+    if (!appointmentItem?.id || appointmentItem.status !== "pending") return;
+    setError("");
+    try {
+      await updateDoc(doc(db, "appointments", appointmentItem.id), {
+        status: "confirmed",
+        confirmedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   return (
     <>
       {error && <p className="notice">{error}</p>}
@@ -763,7 +778,12 @@ function AdminDashboard() {
                     {appointmentItem.appointDate || "ไม่ระบุวันที่"} {appointmentItem.appointTime || ""}
                   </p>
                 </div>
-                <span>{appointmentItem.status || "pending"}</span>
+                <div className="actions">
+                  <span>{appointmentItem.status || "pending"}</span>
+                  {appointmentItem.status === "pending" && (
+                    <button type="button" onClick={() => confirmAppointment(appointmentItem)}>ยืนยันนัด</button>
+                  )}
+                </div>
               </div>
             ))
           ) : (
