@@ -478,6 +478,7 @@ function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [payments, setPayments] = useState([]);
+ const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedQuestion, setSelectedQuestion] = useState(null);
@@ -535,6 +536,8 @@ function AdminDashboard() {
       setUsers(us.docs.map((d) => ({ id: d.id, ...d.data() })));
       setQuestions(qs.docs.map((d) => ({ id: d.id, ...d.data() })));
       setPayments(ps.docs.map((d) => ({ id: d.id, ...d.data() })));
+ const appointmentSnap = await getDocs(query(collection(db, "appointments"), orderBy("createdAt", "desc"), limit(10)));
+ setAppointments(appointmentSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (e) {
       setError(e.message);
     }
@@ -743,6 +746,28 @@ function AdminDashboard() {
           ))
           ) : (
             <p>ยังไม่มีรายการชำระเงิน</p>
+          )}
+        </div>
+      </section>
+      <section className="card">
+        <h3>จัดการนัดหมาย</h3>
+        <div className="list">
+          {appointments.length ? (
+            appointments.map((appointmentItem) => (
+              <div className="listItem" key={appointmentItem.id}>
+                <div>
+                  <strong>{appointmentItem.userName || "ไม่ระบุชื่อ"}</strong>
+                  <p>{appointmentItem.userEmail || "ไม่ระบุอีเมล"}</p>
+                  <p>{appointmentItem.caseType || "ไม่ระบุประเภทคดี"}</p>
+                  <p>
+                    {appointmentItem.appointDate || "ไม่ระบุวันที่"} {appointmentItem.appointTime || ""}
+                  </p>
+                </div>
+                <span>{appointmentItem.status || "pending"}</span>
+              </div>
+            ))
+          ) : (
+            <p>ยังไม่มีรายการนัดหมาย</p>
           )}
         </div>
       </section>
