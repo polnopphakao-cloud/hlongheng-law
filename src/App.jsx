@@ -119,7 +119,7 @@ export default function App() {
           โดยยึดมั่นในความสุจริตและหลักนิติธรรม
         </p>
         <div className="actions">
-          <button className="primary">ปรึกษาคดี</button>
+ <button className="primary" onClick={() => setMode(user ? "dashboard" : "auth")}>ปรึกษาคดี</button>
           <button
             className="secondary"
             onClick={() => setMode(user ? "dashboard" : "auth")}
