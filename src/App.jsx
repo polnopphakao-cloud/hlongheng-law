@@ -694,6 +694,36 @@ function AdminDashboard() {
     }
   }
 
+  async function completeAppointment(appointmentItem) {
+    if (!appointmentItem?.id || appointmentItem.status !== "confirmed") return;
+    setError("");
+    try {
+      await updateDoc(doc(db, "appointments", appointmentItem.id), {
+        status: "completed",
+        completedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function cancelAppointment(appointmentItem) {
+    if (!appointmentItem?.id || !["pending", "confirmed"].includes(appointmentItem.status)) return;
+    setError("");
+    try {
+      await updateDoc(doc(db, "appointments", appointmentItem.id), {
+        status: "cancelled",
+        cancelledAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      await load();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   return (
     <>
       {error && <p className="notice">{error}</p>}
@@ -824,6 +854,12 @@ function AdminDashboard() {
                   <span>{appointmentItem.status || "pending"}</span>
                   {appointmentItem.status === "pending" && (
                     <button type="button" onClick={() => confirmAppointment(appointmentItem)}>ยืนยันนัด</button>
+                  )}
+                  {appointmentItem.status === "confirmed" && (
+                    <button type="button" onClick={() => completeAppointment(appointmentItem)}>เสร็จสิ้น</button>
+                  )}
+                  {["pending", "confirmed"].includes(appointmentItem.status) && (
+                    <button type="button" onClick={() => cancelAppointment(appointmentItem)}>ยกเลิกนัด</button>
                   )}
                 </div>
               </div>
