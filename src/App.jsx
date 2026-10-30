@@ -242,6 +242,16 @@ function appointmentStatusLabel(status) {
   return labels[status] || status || "รอยืนยัน";
 }
 
+function adminStatusLabel(status) {
+  const labels = {
+    pending: "รอดำเนินการ",
+    answered: "ตอบแล้ว",
+    approved: "อนุมัติแล้ว",
+    rejected: "ไม่อนุมัติ",
+  };
+  return labels[status] || status || "รอดำเนินการ";
+}
+
 
 function MemberDashboard({ user, profile }) {
   const [title, setTitle] = useState("");
@@ -827,7 +837,7 @@ function AdminDashboard() {
                   </small>
                 </div>
                 <div>
-              <span>{q.status || "pending"}</span>
+              <span>{adminStatusLabel(q.status)}</span>
               <button className="secondary small" onClick={() => { setSelectedQuestion(q); setAnswerText(q.answer || ""); }}>
                 ตอบคำถาม
               </button>
@@ -853,7 +863,7 @@ function AdminDashboard() {
                 <p>เลขอ้างอิง: {p.reference || "-"}</p>
               </div>
               <div>
-                <span>{p.status || "pending"}</span>
+                <span>{adminStatusLabel(p.status)}</span>
                 {(p.status || "pending") === "pending" && (
                   <div className="actions">
                     <button className="primary" onClick={() => approvePayment(p)}>
