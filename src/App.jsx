@@ -215,6 +215,16 @@ function Dashboard({ user, profile, isAdmin, logout, home }) {
     </main>
   );
 }
+function appointmentStatusLabel(status) {
+  const labels = {
+    pending: "รอยืนยัน",
+    confirmed: "ยืนยันแล้ว",
+    completed: "เสร็จสิ้น",
+    cancelled: "ยกเลิกแล้ว",
+  };
+  return labels[status] || status || "รอยืนยัน";
+}
+
 
 function MemberDashboard({ user, profile }) {
   const [title, setTitle] = useState("");
@@ -503,7 +513,7 @@ function MemberDashboard({ user, profile }) {
                   <strong>{appointmentItem.caseType || "ไม่ระบุประเภทคดี"}</strong>
                   <p>{appointmentItem.appointDate || "ไม่ระบุวันที่"} {appointmentItem.appointTime || ""}</p>
                 </div>
-                <span>{appointmentItem.status || "pending"}</span>
+                <span>{appointmentStatusLabel(appointmentItem.status)}</span>
               </div>
             ))
           ) : (
@@ -851,7 +861,7 @@ function AdminDashboard() {
                   </p>
                 </div>
                 <div className="actions">
-                  <span>{appointmentItem.status || "pending"}</span>
+                  <span>{appointmentStatusLabel(appointmentItem.status)}</span>
                   {appointmentItem.status === "pending" && (
                     <button type="button" onClick={() => confirmAppointment(appointmentItem)}>ยืนยันนัด</button>
                   )}
