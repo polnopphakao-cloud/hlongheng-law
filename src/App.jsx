@@ -381,6 +381,14 @@ function MemberDashboard({ user, profile }) {
       return;
     }
 
+  const selectedAppointmentDateTime = new Date(
+    `${appointment.appointDate}T${appointment.appointTime}`
+  );
+  if (Number.isNaN(selectedAppointmentDateTime.getTime()) || selectedAppointmentDateTime < new Date()) {
+    setAppointmentNotice("กรุณาเลือกวันและเวลานัดหมายในอนาคต");
+    return;
+  }
+
     setSendingAppointment(true);
 
     try {
