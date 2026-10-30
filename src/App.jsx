@@ -190,13 +190,13 @@ function Dashboard({ user, profile, isAdmin, logout, home }) {
       <aside>
         <div className="brand">⚖ นพเก้า</div>
         <button onClick={home}>หน้าเว็บไซต์</button>
-        <button type="button" onClick={() => document.getElementById("member-info")?.scrollIntoView({ behavior: "smooth" })}>ข้อมูลสมาชิก</button>
-        <button type="button" onClick={() => document.getElementById("consultation-form")?.scrollIntoView({ behavior: "smooth" })}>คำถามปรึกษา</button>
+        <button type="button" onClick={() => document.getElementById(isAdmin ? "admin-summary" : "member-info")?.scrollIntoView({ behavior: "smooth", block: "start" })}>ข้อมูลสมาชิก</button>
+        <button type="button" onClick={() => document.getElementById(isAdmin ? "admin-questions" : "consultation-form")?.scrollIntoView({ behavior: "smooth", block: "start" })}>คำถามปรึกษา</button>
         {isAdmin && (
           <>
-            <button>จัดการสมาชิก</button>
-            <button>การชำระเงิน</button>
-            <button>รายงาน</button>
+          <button type="button" onClick={() => document.getElementById("admin-members")?.scrollIntoView({ behavior: "smooth", block: "start" })}>จัดการสมาชิก</button>
+          <button type="button" onClick={() => document.getElementById("admin-payments")?.scrollIntoView({ behavior: "smooth", block: "start" })}>การชำระเงิน</button>
+          <button type="button" onClick={() => document.getElementById("admin-appointments")?.scrollIntoView({ behavior: "smooth", block: "start" })}>จัดการนัดหมาย</button>
           </>
         )}
         <button onClick={logout}>ออกจากระบบ</button>
@@ -746,7 +746,7 @@ function AdminDashboard() {
   return (
     <>
       {error && <p className="notice">{error}</p>}
-      <div className="cards">
+      <div id="admin-summary" className="cards">
         <Card title="สมาชิกทั้งหมด" value={loading ? "..." : stats.users} />
         <Card title="คำถามทั้งหมด" value={loading ? "..." : stats.questions} />
         <Card
@@ -756,7 +756,7 @@ function AdminDashboard() {
       </div>
       <section className="panel adminPanel">
         <div className="sectionHead">
-          <h3>สมาชิกล่าสุด</h3>
+          <h3 id="admin-members">สมาชิกล่าสุด</h3>
           <button className="secondary small" onClick={load}>
             รีเฟรช
           </button>
@@ -798,7 +798,7 @@ function AdminDashboard() {
       </section>
       <section className="adminSplit">
         <div className="panel">
-          <h3>คำถามล่าสุด {newQuestionCount > 0 && <span style={{ color: "#ff4d4f", marginLeft: "10px" }}>คำถามใหม่ {newQuestionCount}</span>}</h3>
+          <h3 id="admin-questions">คำถามล่าสุด {newQuestionCount > 0 && <span style={{ color: "#ff4d4f", marginLeft: "10px" }}>คำถามใหม่ {newQuestionCount}</span>}</h3>
           {questions.length ? (
             questions.map((q) => (
               <div className="listItem questionItem" key={q.id}>
@@ -824,7 +824,7 @@ function AdminDashboard() {
         
       {selectedQuestion && (<div className="panel"><h3>ตอบคำถาม</h3><p><strong>{selectedQuestion.subject || "ไม่มีหัวข้อ"}</strong></p><p>{selectedQuestion.detail || "ไม่มีรายละเอียดคำถาม"}</p><textarea rows="8" value={answerText} onChange={(e) => setAnswerText(e.target.value)} placeholder="พิมพ์คำตอบที่นี่" /><div className="actions"><button className="primary" onClick={saveAnswer} disabled={savingAnswer || !answerText.trim()}>{savingAnswer ? "กำลังบันทึก..." : "บันทึกคำตอบ"}</button><button className="secondary" onClick={() => { setSelectedQuestion(null); setAnswerText(""); }}>ยกเลิก</button></div></div>)}
         <div className="panel">
-          <h3>การชำระเงินล่าสุด</h3>
+        <h3 id="admin-payments">การชำระเงินล่าสุด</h3>
           {payments.length ? (
           payments.map((p) => (
             <div className="listItem" key={p.id}>
@@ -856,7 +856,7 @@ function AdminDashboard() {
         </div>
       </section>
       <section className="card">
-        <h3>จัดการนัดหมาย</h3>
+        <h3 id="admin-appointments">จัดการนัดหมาย</h3>
         <div className="list">
           {appointments.length ? (
             appointments.map((appointmentItem) => (
