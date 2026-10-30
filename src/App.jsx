@@ -513,7 +513,7 @@ function MemberDashboard({ user, profile }) {
                   <strong>{appointmentItem.caseType || "ไม่ระบุประเภทคดี"}</strong>
                   <p>{appointmentItem.appointDate || "ไม่ระบุวันที่"} {appointmentItem.appointTime || ""}</p>
                 </div>
-                <span>{appointmentStatusLabel(appointmentItem.status)}</span>
+                <span className={"status status-" + (appointmentItem.status || "pending")}>{appointmentStatusLabel(appointmentItem.status)}</span>
               </div>
             ))
           ) : (
@@ -861,7 +861,7 @@ function AdminDashboard() {
                   </p>
                 </div>
                 <div className="actions">
-                  <span>{appointmentStatusLabel(appointmentItem.status)}</span>
+                  <span className={"status status-" + (appointmentItem.status || "pending")}>{appointmentStatusLabel(appointmentItem.status)}</span>
                   {appointmentItem.status === "pending" && (
                     <button type="button" onClick={() => confirmAppointment(appointmentItem)}>ยืนยันนัด</button>
                   )}
