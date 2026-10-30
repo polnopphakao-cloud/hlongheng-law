@@ -485,6 +485,7 @@ function MemberDashboard({ user, profile }) {
 
     <input
       type="date"
+        min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10)}
       value={appointment.appointDate}
       onChange={(e) => setAppointment({ ...appointment, appointDate: e.target.value })}
       required
