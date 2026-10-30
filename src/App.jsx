@@ -190,8 +190,8 @@ function Dashboard({ user, profile, isAdmin, logout, home }) {
       <aside>
         <div className="brand">⚖ นพเก้า</div>
         <button onClick={home}>หน้าเว็บไซต์</button>
-        <button>ข้อมูลสมาชิก</button>
-        <button>คำถามปรึกษา</button>
+        <button type="button" onClick={() => document.getElementById("member-info")?.scrollIntoView({ behavior: "smooth" })}>ข้อมูลสมาชิก</button>
+        <button type="button" onClick={() => document.getElementById("consultation-form")?.scrollIntoView({ behavior: "smooth" })}>คำถามปรึกษา</button>
         {isAdmin && (
           <>
             <button>จัดการสมาชิก</button>
@@ -418,14 +418,14 @@ function MemberDashboard({ user, profile }) {
   }
   return (
     <>
-      <div className="cards">
+      <div id="member-info" className="cards">
         <Card title="สถานะสมาชิก" value={profile?.plan || "free"} />
         <Card title="สิทธิ์คำถาม" value={`${used} / ${limitValue}`} />
         <Card title="สิทธิ์คงเหลือ" value={remaining} />
         <Card title="สถานะบัญชี" value={profile?.status || "active"} />
       </div>
 
-      <section className="panel">
+      <section id="consultation-form" className="panel">
         <h3>ส่งคำถามปรึกษา</h3>
         <p>กรอกหัวข้อและรายละเอียดคำถามให้ครบถ้วน</p>
 
