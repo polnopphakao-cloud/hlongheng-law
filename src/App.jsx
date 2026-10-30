@@ -3,6 +3,7 @@ import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut,
   updateProfile,
 } from "firebase/auth";
@@ -92,10 +93,25 @@ export default function App() {
     }
   }
 
+  async function resetPassword() {
+    const email = form.email.trim();
+    if (!email) {
+      setMsg("กรุณากรอกอีเมลก่อนขอรีเซ็ตรหัสผ่าน");
+      return;
+    }
+    setMsg("");
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setMsg("ส่งลิงก์ตั้งรหัสผ่านใหม่ไปยังอีเมลแล้ว กรุณาตรวจสอบกล่องจดหมาย");
+    } catch (err) {
+      setMsg("ไม่สามารถส่งลิงก์ตั้งรหัสผ่านได้ กรุณาตรวจสอบอีเมลแล้วลองใหม่");
+    }
+  }
+
   if (mode === "auth")
     return (
       <Auth
-        {...{ form, setForm, register, login, msg }}
+        {...{ form, setForm, register, login, resetPassword, msg }}
         back={() => setMode("home")}
       />
     );
@@ -133,7 +149,7 @@ export default function App() {
   );
 }
 
-function Auth({ form, setForm, register, login, msg, back }) {
+function Auth({ form, setForm, register, login, resetPassword, msg, back }) {
   const [tab, setTab] = useState("register");
   return (
     <main className="page">
@@ -169,6 +185,7 @@ function Auth({ form, setForm, register, login, msg, back }) {
           <button className="primary" type="submit">
             {tab === "register" ? "สมัครสมาชิก" : "เข้าสู่ระบบ"}
           </button>
+        {tab === "login" && <button className="link" type="button" onClick={resetPassword}>ลืมรหัสผ่าน?</button>}
         </form>
         {msg && <p className="notice">{msg}</p>}
         <button
