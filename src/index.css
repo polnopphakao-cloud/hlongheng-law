@@ -2458,3 +2458,183 @@ textarea[placeholder*="รายละเอียดคำถาม"] {
   }
 }
 
+/* === HLONGHENG ANSWER BOX PATCH START === */
+
+.content,
+.content > section,
+.content > div,
+.admin-content,
+.admin-main,
+.admin-panel {
+  min-width: 0;
+}
+
+.admin-questions-layout,
+.questions-layout,
+.question-management-grid,
+.admin-question-grid,
+.questions-container {
+  display: grid !important;
+  grid-template-columns: minmax(520px, 1fr) minmax(560px, 1.08fr) !important;
+  gap: 24px !important;
+  align-items: start !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.questions-panel,
+.question-list-panel,
+.answer-panel,
+.admin-answer,
+.question-answer,
+.answer-card,
+.content form:has(textarea) {
+  min-width: 0 !important;
+  width: 100% !important;
+}
+
+.answer-panel,
+.admin-answer,
+.question-answer,
+.answer-card,
+.content form:has(textarea) {
+  padding: 30px !important;
+  border: 1px solid rgba(217, 164, 65, 0.46) !important;
+  border-radius: 26px !important;
+  background: #0d1729 !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.22) !important;
+}
+
+.content textarea,
+.admin-content textarea,
+.admin-main textarea,
+.answer-panel textarea,
+.admin-answer textarea,
+.question-answer textarea,
+.answer-card textarea,
+form textarea {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  min-height: 300px !important;
+  padding: 18px 20px !important;
+  margin: 14px 0 0 !important;
+  border: 1px solid #42516b !important;
+  border-radius: 14px !important;
+  outline: none !important;
+  resize: vertical !important;
+  overflow-y: auto !important;
+  overflow-wrap: anywhere !important;
+  white-space: pre-wrap !important;
+  color: #f8fafc !important;
+  background: #07101f !important;
+  font-family: Tahoma, "Noto Sans Thai", sans-serif !important;
+  font-size: 17px !important;
+  line-height: 1.85 !important;
+  transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease !important;
+}
+
+.content textarea:focus,
+.admin-content textarea:focus,
+.admin-main textarea:focus,
+.answer-panel textarea:focus,
+.admin-answer textarea:focus,
+.question-answer textarea:focus,
+.answer-card textarea:focus,
+form textarea:focus {
+  border-color: #fbbf24 !important;
+  background: #081426 !important;
+  box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.13) !important;
+}
+
+.content textarea::placeholder,
+form textarea::placeholder {
+  color: #718096 !important;
+  opacity: 1 !important;
+}
+
+.questions-panel *,
+.question-list-panel *,
+.answer-panel *,
+.admin-answer *,
+.question-answer *,
+.answer-card * {
+  overflow-wrap: anywhere;
+}
+
+.answer-actions,
+.answer-buttons,
+.form-actions,
+.content form:has(textarea) > div:last-child {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 14px !important;
+  margin-top: 20px !important;
+}
+
+.answer-actions button,
+.answer-buttons button,
+.form-actions button,
+.content form:has(textarea) > div:last-child button {
+  min-width: 140px !important;
+  padding: 13px 22px !important;
+}
+
+@media (max-width: 1180px) {
+  .admin-questions-layout,
+  .questions-layout,
+  .question-management-grid,
+  .admin-question-grid,
+  .questions-container {
+    grid-template-columns: 1fr !important;
+  }
+
+  .content textarea,
+  .admin-content textarea,
+  .admin-main textarea,
+  form textarea {
+    min-height: 260px !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .answer-panel,
+  .admin-answer,
+  .question-answer,
+  .answer-card,
+  .content form:has(textarea) {
+    padding: 20px 16px !important;
+    border-radius: 18px !important;
+  }
+
+  .content textarea,
+  .admin-content textarea,
+  .admin-main textarea,
+  form textarea {
+    min-height: 230px !important;
+    padding: 15px !important;
+    border-radius: 11px !important;
+    font-size: 16px !important;
+    line-height: 1.75 !important;
+  }
+
+  .answer-actions,
+  .answer-buttons,
+  .form-actions,
+  .content form:has(textarea) > div:last-child {
+    flex-direction: column !important;
+  }
+
+  .answer-actions button,
+  .answer-buttons button,
+  .form-actions button,
+  .content form:has(textarea) > div:last-child button {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+/* === HLONGHENG ANSWER BOX PATCH END === */
