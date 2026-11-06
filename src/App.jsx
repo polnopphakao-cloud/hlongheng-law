@@ -212,7 +212,7 @@ export default function App() {
                 setMenuOpen(false);
               }}
             >
-              ติดต่อ
+              ติดต่อเรา
             </button>
 
             <button
