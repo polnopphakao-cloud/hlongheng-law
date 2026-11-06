@@ -1,0 +1,107 @@
+import { useState } from "react";
+
+const contacts = [
+  {
+    icon: "☎",
+    label: "โทรศัพท์หลัก",
+    value: "098-997-9233",
+    href: "tel:0989979233",
+    action: "โทรตอนนี้",
+  },
+  {
+    icon: "☎",
+    label: "โทรศัพท์สำรอง",
+    value: "061-329-3939",
+    href: "tel:0613293939",
+    action: "โทรตอนนี้",
+  },
+  {
+    icon: "LINE",
+    label: "LINE ID",
+    value: "detective-thai",
+    href: "https://line.me/ti/p/~detective-thai",
+    action: "เปิด LINE",
+  },
+  {
+    icon: "✉",
+    label: "อีเมล",
+    value: "polnopphakao@gmail.com",
+    href: "mailto:polnopphakao@gmail.com?subject=ติดต่อสำนักงานกฎหมายนพเก้า",
+    action: "ส่งอีเมล",
+  },
+];
+
+export default function ContactSection({ onConsult }) {
+  const [copied, setCopied] = useState("");
+
+  async function copyValue(value) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(value);
+      window.setTimeout(() => setCopied(""), 1800);
+    } catch {
+      setCopied("");
+    }
+  }
+
+  return (
+    <section id="contact-us" className="contact-section" aria-labelledby="contact-title">
+      <div className="contact-heading">
+        <div>
+          <span className="contact-kicker">CONTACT US</span>
+          <h2 id="contact-title">ติดต่อสำนักงาน</h2>
+          <p>ติดต่อสอบถาม นัดหมาย หรือส่งข้อมูลเบื้องต้นผ่านช่องทางที่สะดวก</p>
+        </div>
+        <button type="button" className="contact-consult-button" onClick={onConsult}>
+          ปรึกษาคดีออนไลน์
+        </button>
+      </div>
+
+      <div className="contact-grid">
+        {contacts.map((contact) => (
+          <article className="contact-card" key={contact.value}>
+            <div className="contact-icon" aria-hidden="true">{contact.icon}</div>
+            <div className="contact-copy">
+              <span>{contact.label}</span>
+              <strong>{contact.value}</strong>
+            </div>
+            <div className="contact-actions">
+              <a
+                href={contact.href}
+                target={contact.href.startsWith("http") ? "_blank" : undefined}
+                rel={contact.href.startsWith("http") ? "noreferrer" : undefined}
+              >
+                {contact.action}
+              </a>
+              <button type="button" onClick={() => copyValue(contact.value)}>
+                {copied === contact.value ? "คัดลอกแล้ว" : "คัดลอก"}
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div className="office-map-card">
+        <div className="office-map-copy">
+          <span className="contact-kicker">OFFICE MAP</span>
+          <h3>แผนที่สำนักงาน</h3>
+          <p>เปิดเส้นทางไปยังสำนักงานผ่าน Google Maps</p>
+        </div>
+
+        <a
+          className="office-map-button"
+          href="https://maps.app.goo.gl/mwK1nZvhcJ8SMRCS9?g_st=ac"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          เปิดแผนที่และนำทาง
+        </a>
+      </div>
+
+      <div className="contact-note">
+        <strong>ก่อนติดต่อ</strong>
+        <p>โปรดเตรียมสรุปข้อเท็จจริง วันเวลาที่เกี่ยวข้อง และเอกสารสำคัญเบื้องต้น เพื่อให้การให้คำปรึกษารวดเร็วและตรงประเด็นยิ่งขึ้น</p>
+      </div>
+    </section>
+  );
+}

@@ -1,0 +1,165 @@
+import { useEffect } from "react";
+
+const MENU_MAP = [
+  { label: "ข้อมูลสมาชิก", key: "members" },
+  { label: "คำถามปรึกษา", key: "questions" },
+  { label: "จัดการสมาชิก", key: "member-manager" },
+  { label: "การชำระเงิน", key: "payments" },
+  { label: "จัดการนัดหมาย", key: "appointments" },
+];
+
+const PAGE_HEADINGS = {
+  members: ["สมาชิกทั้งหมด", "สมาชิกล่าสุด"],
+  questions: ["คำถามล่าสุด", "คำถามใหม่"],
+  "member-manager": ["จัดการสิทธิสมาชิก"],
+  payments: ["การชำระเงินล่าสุด"],
+  appointments: ["จัดการนัดหมาย", "รายการนัดหมาย", "นัดหมายทั้งหมด"],
+};
+
+const ALL_HEADINGS = Object.values(PAGE_HEADINGS).flat();
+
+function textOf(element) {
+  return String(element?.textContent || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function countRouteHeadings(element) {
+  const text = textOf(element);
+  return ALL_HEADINGS.filter((heading) => text.includes(heading)).length;
+}
+
+function findMenu(label) {
+  return Array.from(document.querySelectorAll("a, button")).find(
+    (element) => textOf(element) === label,
+  );
+}
+
+function findHeading(candidates) {
+  const headings = Array.from(
+    document.querySelectorAll("h1, h2, h3, h4, .sectionHead"),
+  );
+
+  return headings.find((element) => {
+    const text = textOf(element);
+    return candidates.some(
+      (candidate) => text === candidate || text.includes(candidate),
+    );
+  });
+}
+
+function findIndependentBlock(key) {
+  const heading = findHeading(PAGE_HEADINGS[key] || []);
+  if (!heading) return null;
+
+  let current = heading.closest("div, section, article") || heading;
+  let best = current;
+
+  while (current.parentElement) {
+    const currentCount = countRouteHeadings(current);
+    const parentCount = countRouteHeadings(current.parentElement);
+
+    if (currentCount === 1) {
+      best = current;
+    }
+
+    if (currentCount === 1 && parentCount > 1) {
+      return current;
+    }
+
+    if (parentCount === 0) {
+      break;
+    }
+
+    current = current.parentElement;
+  }
+
+  return best;
+}
+
+function findSummary() {
+  return Array.from(document.querySelectorAll("div"))
+    .filter((element) => {
+      const text = textOf(element);
+      return (
+        text.includes("สมาชิกทั้งหมด") &&
+        text.includes("คำถามทั้งหมด") &&
+        text.includes("การชำระเงินทั้งหมด")
+      );
+    })
+    .sort(
+      (left, right) =>
+        left.querySelectorAll("*").length -
+        right.querySelectorAll("*").length,
+    )[0] || null;
+}
+
+export default function AdminPageRouter() {
+  useEffect(() => {
+    const menus = MENU_MAP.map((item) => ({
+      ...item,
+      element: findMenu(item.label),
+    })).filter((item) => item.element);
+
+    const blocks = Object.keys(PAGE_HEADINGS)
+      .map((key) => ({ key, element: findIndependentBlock(key) }))
+      .filter((item) => item.element);
+
+    const summary = findSummary();
+
+    function showPage(key, replace = false) {
+      blocks.forEach(({ key: blockKey, element }) => {
+        const visible = blockKey === key;
+        element.classList.toggle("admin-page-hidden", !visible);
+        element.setAttribute("aria-hidden", visible ? "false" : "true");
+      });
+
+      menus.forEach(({ key: menuKey, element }) => {
+        const active = menuKey === key;
+        element.classList.toggle("admin-menu-active", active);
+        element.setAttribute("aria-current", active ? "page" : "false");
+      });
+
+      if (summary) {
+        summary.classList.add("admin-page-hidden");
+      }
+
+      const nextHash = `#admin-${key}`;
+      if (window.location.hash !== nextHash) {
+        const method = replace ? "replaceState" : "pushState";
+        window.history[method]({ adminPage: key }, "", nextHash);
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    const cleanups = [];
+
+    menus.forEach(({ key, element }) => {
+      const handler = (event) => {
+        event.preventDefault();
+        showPage(key);
+      };
+      element.addEventListener("click", handler);
+      cleanups.push(() => element.removeEventListener("click", handler));
+    });
+
+    const requested = window.location.hash.replace("#admin-", "");
+    showPage(PAGE_HEADINGS[requested] ? requested : "members", true);
+
+    const onHistory = () => {
+      const requestedKey = window.location.hash.replace("#admin-", "");
+      showPage(
+        PAGE_HEADINGS[requestedKey] ? requestedKey : "members",
+        true,
+      );
+    };
+
+    window.addEventListener("popstate", onHistory);
+    cleanups.push(() => window.removeEventListener("popstate", onHistory));
+
+    return () => cleanups.forEach((cleanup) => cleanup());
+  }, []);
+
+  return null;
+}

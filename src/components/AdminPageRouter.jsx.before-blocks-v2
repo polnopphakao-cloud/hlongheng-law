@@ -1,0 +1,149 @@
+import { useEffect } from "react";
+
+const MENU_MAP = [
+  { label: "ข้อมูลสมาชิก", key: "members" },
+  { label: "คำถามปรึกษา", key: "questions" },
+  { label: "จัดการสมาชิก", key: "member-manager" },
+  { label: "การชำระเงิน", key: "payments" },
+  { label: "จัดการนัดหมาย", key: "appointments" },
+];
+
+const PAGE_HEADINGS = {
+  members: ["สมาชิกทั้งหมด", "สมาชิกล่าสุด"],
+  questions: ["คำถามล่าสุด", "คำถามปรึกษา", "รายการคำถาม"],
+  "member-manager": ["จัดการสิทธิสมาชิก"],
+  payments: ["การชำระเงินล่าสุด", "รายการชำระเงิน"],
+  appointments: ["จัดการนัดหมาย", "รายการนัดหมาย", "นัดหมายทั้งหมด"],
+};
+
+const ALL_HEADINGS = Object.values(PAGE_HEADINGS).flat();
+
+function normalize(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function findControl(label) {
+  return Array.from(document.querySelectorAll("a, button")).find(
+    (element) => normalize(element.textContent) === label,
+  );
+}
+
+function findHeading(candidates) {
+  const elements = Array.from(
+    document.querySelectorAll("h1, h2, h3, h4, strong, .sectionHead"),
+  );
+  return elements.find((element) => {
+    const text = normalize(element.textContent);
+    return candidates.some(
+      (candidate) => text === candidate || text.includes(candidate),
+    );
+  });
+}
+
+function routeHeadingCount(element) {
+  const text = normalize(element?.textContent);
+  return ALL_HEADINGS.filter((heading) => text.includes(heading)).length;
+}
+
+function findPageBlock(key) {
+  const heading = findHeading(PAGE_HEADINGS[key] || []);
+  if (!heading) return null;
+
+  let current = heading;
+  while (current.parentElement) {
+    const parent = current.parentElement;
+    if (routeHeadingCount(parent) > 1) {
+      return current;
+    }
+    if (current.matches("section.panel, .adminPanel")) {
+      return current;
+    }
+    current = parent;
+  }
+
+  return heading.closest("section.panel, .adminPanel") || heading;
+}
+
+function findSummaryBlock() {
+  return Array.from(document.querySelectorAll("div"))
+    .filter((element) => {
+      const text = normalize(element.textContent);
+      return (
+        text.includes("สมาชิกทั้งหมด") &&
+        text.includes("คำถามทั้งหมด") &&
+        text.includes("การชำระเงินทั้งหมด")
+      );
+    })
+    .sort(
+      (left, right) =>
+        left.querySelectorAll("*").length -
+        right.querySelectorAll("*").length,
+    )[0] || null;
+}
+
+export default function AdminPageRouter() {
+  useEffect(() => {
+    const controls = MENU_MAP.map((item) => ({
+      ...item,
+      element: findControl(item.label),
+    })).filter((item) => item.element);
+
+    const blocks = Object.keys(PAGE_HEADINGS)
+      .map((key) => ({ key, element: findPageBlock(key) }))
+      .filter((item) => item.element);
+
+    const summary = findSummaryBlock();
+
+    const activatePage = (key, replaceHistory = false) => {
+      blocks.forEach(({ key: blockKey, element }) => {
+        const visible = blockKey === key;
+        element.classList.toggle("admin-page-hidden", !visible);
+        element.setAttribute("aria-hidden", visible ? "false" : "true");
+      });
+
+      controls.forEach(({ key: controlKey, element }) => {
+        const active = controlKey === key;
+        element.classList.toggle("admin-menu-active", active);
+        element.setAttribute("aria-current", active ? "page" : "false");
+      });
+
+      if (summary) summary.classList.add("admin-page-hidden");
+
+      const nextHash = `#admin-${key}`;
+      if (window.location.hash !== nextHash) {
+        const method = replaceHistory ? "replaceState" : "pushState";
+        window.history[method]({ adminPage: key }, "", nextHash);
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    const cleanups = [];
+    controls.forEach(({ key, element }) => {
+      const handler = (event) => {
+        event.preventDefault();
+        activatePage(key);
+      };
+      element.addEventListener("click", handler);
+      cleanups.push(() => element.removeEventListener("click", handler));
+    });
+
+    const requested = window.location.hash.replace("#admin-", "");
+    const initial = PAGE_HEADINGS[requested] ? requested : "members";
+    activatePage(initial, true);
+
+    const popHandler = () => {
+      const requestedKey = window.location.hash.replace("#admin-", "");
+      activatePage(
+        PAGE_HEADINGS[requestedKey] ? requestedKey : "members",
+        true,
+      );
+    };
+    window.addEventListener("popstate", popHandler);
+    cleanups.push(() => window.removeEventListener("popstate", popHandler));
+
+    return () => cleanups.forEach((cleanup) => cleanup());
+  }, []);
+
+  return null;
+}

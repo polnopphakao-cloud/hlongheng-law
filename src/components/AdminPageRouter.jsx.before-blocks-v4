@@ -1,0 +1,221 @@
+import { useEffect } from "react";
+
+const MENU_MAP = [
+  { label: "ข้อมูลสมาชิก", key: "members" },
+  { label: "คำถามปรึกษา", key: "questions" },
+  { label: "จัดการสมาชิก", key: "member-manager" },
+  { label: "การชำระเงิน", key: "payments" },
+  { label: "จัดการนัดหมาย", key: "appointments" },
+];
+
+const HEADINGS = {
+  members: ["สมาชิกทั้งหมด", "สมาชิกล่าสุด"],
+  questions: ["คำถามล่าสุด", "คำถามใหม่"],
+  "member-manager": ["จัดการสิทธิสมาชิก"],
+  payments: ["การชำระเงินล่าสุด"],
+  appointments: ["จัดการนัดหมาย", "รายการนัดหมาย", "นัดหมายทั้งหมด"],
+};
+
+function cleanText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function findMenu(label) {
+  return Array.from(document.querySelectorAll("a, button")).find(
+    (element) => cleanText(element.textContent) === label,
+  );
+}
+
+function findHeading(candidates) {
+  const elements = Array.from(
+    document.querySelectorAll("h1, h2, h3, h4, strong, .sectionHead"),
+  );
+  return elements.find((element) => {
+    const text = cleanText(element.textContent);
+    return candidates.some(
+      (candidate) => text === candidate || text.includes(candidate),
+    );
+  });
+}
+
+function ancestors(element) {
+  const result = [];
+  let current = element;
+  while (current) {
+    result.push(current);
+    current = current.parentElement;
+  }
+  return result;
+}
+
+function commonAncestor(left, right) {
+  if (!left || !right) return null;
+  const rightSet = new Set(ancestors(right));
+  return ancestors(left).find((item) => rightSet.has(item)) || null;
+}
+
+function directChildUnder(element, ancestor) {
+  if (!element || !ancestor) return null;
+  let current = element;
+  while (current.parentElement && current.parentElement !== ancestor) {
+    current = current.parentElement;
+  }
+  return current.parentElement === ancestor ? current : null;
+}
+
+function panelForSingleHeading(heading) {
+  if (!heading) return null;
+  return (
+    heading.closest("section.panel, .adminPanel") ||
+    heading.closest("section, article") ||
+    heading.parentElement
+  );
+}
+
+function findSummary() {
+  return Array.from(document.querySelectorAll("div"))
+    .filter((element) => {
+      const text = cleanText(element.textContent);
+      return (
+        text.includes("สมาชิกทั้งหมด") &&
+        text.includes("คำถามทั้งหมด") &&
+        text.includes("การชำระเงินทั้งหมด")
+      );
+    })
+    .sort(
+      (left, right) =>
+        left.querySelectorAll("*").length -
+        right.querySelectorAll("*").length,
+    )[0] || null;
+}
+
+export default function AdminPageRouter() {
+  useEffect(() => {
+    const menus = MENU_MAP.map((item) => ({
+      ...item,
+      element: findMenu(item.label),
+    })).filter((item) => item.element);
+
+    const headingElements = Object.fromEntries(
+      Object.entries(HEADINGS).map(([key, candidates]) => [
+        key,
+        findHeading(candidates),
+      ]),
+    );
+
+    const pageBlocks = new Map();
+
+    // Questions and payments are two columns inside one shared panel.
+    const shared = commonAncestor(
+      headingElements.questions,
+      headingElements.payments,
+    );
+    const questionColumn = directChildUnder(
+      headingElements.questions,
+      shared,
+    );
+    const paymentColumn = directChildUnder(
+      headingElements.payments,
+      shared,
+    );
+
+    if (
+      questionColumn &&
+      paymentColumn &&
+      questionColumn !== paymentColumn
+    ) {
+      pageBlocks.set("questions", [questionColumn]);
+      pageBlocks.set("payments", [paymentColumn]);
+    } else {
+      pageBlocks.set(
+        "questions",
+        [panelForSingleHeading(headingElements.questions)].filter(Boolean),
+      );
+      pageBlocks.set(
+        "payments",
+        [panelForSingleHeading(headingElements.payments)].filter(Boolean),
+      );
+    }
+
+    pageBlocks.set(
+      "members",
+      [panelForSingleHeading(headingElements.members)].filter(Boolean),
+    );
+    pageBlocks.set(
+      "member-manager",
+      [panelForSingleHeading(headingElements["member-manager"])].filter(Boolean),
+    );
+    pageBlocks.set(
+      "appointments",
+      [panelForSingleHeading(headingElements.appointments)].filter(Boolean),
+    );
+
+    const allBlocks = Array.from(
+      new Set(Array.from(pageBlocks.values()).flat()),
+    );
+    const summary = findSummary();
+    const sharedPanel = shared?.closest("section.panel, .adminPanel");
+
+    function showPage(key, replace = false) {
+      const selected = new Set(pageBlocks.get(key) || []);
+
+      allBlocks.forEach((block) => {
+        const visible = selected.has(block);
+        block.classList.toggle("admin-page-hidden", !visible);
+        block.setAttribute("aria-hidden", visible ? "false" : "true");
+      });
+
+      // Keep the outer shared panel visible while hiding only its columns.
+      if (
+        sharedPanel &&
+        (key === "questions" || key === "payments")
+      ) {
+        sharedPanel.classList.remove("admin-page-hidden");
+        sharedPanel.setAttribute("aria-hidden", "false");
+      } else if (sharedPanel) {
+        sharedPanel.classList.add("admin-page-hidden");
+        sharedPanel.setAttribute("aria-hidden", "true");
+      }
+
+      menus.forEach(({ key: menuKey, element }) => {
+        const active = menuKey === key;
+        element.classList.toggle("admin-menu-active", active);
+        element.setAttribute("aria-current", active ? "page" : "false");
+      });
+
+      if (summary) summary.classList.add("admin-page-hidden");
+
+      const nextHash = `#admin-${key}`;
+      if (window.location.hash !== nextHash) {
+        const method = replace ? "replaceState" : "pushState";
+        window.history[method]({ adminPage: key }, "", nextHash);
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    const cleanups = [];
+    menus.forEach(({ key, element }) => {
+      const handler = (event) => {
+        event.preventDefault();
+        showPage(key);
+      };
+      element.addEventListener("click", handler);
+      cleanups.push(() => element.removeEventListener("click", handler));
+    });
+
+    const requested = window.location.hash.replace("#admin-", "");
+    showPage(HEADINGS[requested] ? requested : "members", true);
+
+    const onHistory = () => {
+      const key = window.location.hash.replace("#admin-", "");
+      showPage(HEADINGS[key] ? key : "members", true);
+    };
+    window.addEventListener("popstate", onHistory);
+    cleanups.push(() => window.removeEventListener("popstate", onHistory));
+
+    return () => cleanups.forEach((cleanup) => cleanup());
+  }, []);
+
+  return null;
+}

@@ -24,7 +24,12 @@ import {
   updateDoc,
   onSnapshot,
 } from "firebase/firestore";
-import { auth, db } from "./lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { auth, db, functions } from "./lib/firebase";
+import AdminMemberManager from "./components/AdminMemberManager";
+import AdminPageRouter from "./components/AdminPageRouter";
+import LegalContentHub from "./components/LegalContentHub";
+import ContactSection from "./components/ContactSection";
 
 const empty = { name: "", email: "", password: "" };
 
@@ -35,6 +40,8 @@ export default function App() {
   const [mode, setMode] = useState("home");
   const [form, setForm] = useState(empty);
   const [msg, setMsg] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(
     () =>
@@ -72,7 +79,7 @@ export default function App() {
         email: form.email,
         role: "member",
         plan: "free",
-        questionLimit: 0,
+        questionLimit: 5,
         questionUsed: 0,
         status: "active",
         createdAt: serverTimestamp(),
@@ -126,6 +133,208 @@ export default function App() {
 
   return (
     <main className="page">
+<nav className="wow-nav" aria-label="เมนูหลัก">
+        <div className="wow-nav-inner">
+          <button
+            type="button"
+            className="wow-brand"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            aria-label="กลับสู่หน้าแรก"
+          >
+            <span className="wow-brand-icon">⚖</span>
+            <span className="wow-brand-text">
+              <strong>NOPPAKAO</strong>
+              <small>LAW OFFICE</small>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className="wow-menu-toggle"
+            aria-expanded={menuOpen}
+            aria-controls="main-navigation"
+            aria-label={menuOpen ? "ปิดเมนู" : "เปิดเมนู"}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            <span />
+            <span />
+            <span />
+          </button>
+
+          <div
+            id="main-navigation"
+            className={`wow-nav-links ${menuOpen ? "is-open" : ""}`}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+                setMenuOpen(false);
+              }}
+            >
+              หน้าแรก
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                document.getElementById("legal-services")?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+                setMenuOpen(false);
+              }}
+            >
+              บริการกฎหมาย
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                document.getElementById("legal-knowledge")?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+                setMenuOpen(false);
+              }}
+            >
+              คลังความรู้
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSearchOpen(false);
+                document.getElementById("contact-us")?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "start",
+                });
+                setMenuOpen(false);
+              }}
+            >
+              ติดต่อ
+            </button>
+
+            <button
+              type="button"
+              aria-expanded={searchOpen}
+              onClick={() => {
+                setSearchOpen((open) => !open);
+                setMenuOpen(false);
+              }}
+            >
+              🔎 ค้นหา
+            </button>
+
+            <button
+              type="button"
+              className="wow-login"
+              onClick={() => setMode(user ? "dashboard" : "auth")}
+            >
+              {user ? "แดชบอร์ด" : "เข้าสู่ระบบ"}
+            </button>
+
+            <button
+              type="button"
+              className="wow-consult"
+              onClick={() => setMode(user ? "dashboard" : "auth")}
+            >
+              ปรึกษาคดี
+            </button>
+          </div>
+        </div>
+
+        {searchOpen && (
+          <form
+            className="wow-search"
+            role="search"
+            onSubmit={(event) => {
+              event.preventDefault();
+
+              const query = String(
+                new FormData(event.currentTarget)
+                  .get("siteSearch") || "",
+              )
+                .trim()
+                .toLocaleLowerCase("th-TH");
+
+              if (!query) {
+                alert("กรุณาพิมพ์คำที่ต้องการค้นหา");
+                return;
+              }
+
+              const selector = [
+                ".legal-service-card",
+                ".knowledge-card",
+                ".guide-list article",
+                ".free-member-offer",
+                ".hero",
+              ].join(",");
+
+              const candidates = Array.from(
+                document.querySelectorAll(selector),
+              );
+
+              const normalized = (value) =>
+                String(value || "")
+                  .replace(/\s+/g, " ")
+                  .trim()
+                  .toLocaleLowerCase("th-TH");
+
+              const match = candidates.find((element) =>
+                normalized(element.textContent).includes(query),
+              );
+
+              if (!match) {
+                alert(`ไม่พบคำว่า “${query}” ในบริการหรือคลังความรู้`);
+                return;
+              }
+
+              // Scroll first while the result element is still mounted.
+              match.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+              match.classList.remove("site-search-hit");
+              void match.offsetWidth;
+              match.classList.add("site-search-hit");
+
+              window.setTimeout(() => {
+                match.classList.remove("site-search-hit");
+              }, 3200);
+
+              // Close the search panel after scrolling has started.
+              window.setTimeout(() => {
+                setSearchOpen(false);
+                setMenuOpen(false);
+              }, 450);
+            }}
+          >
+            <label htmlFor="site-search">ค้นหาข้อมูลในเว็บไซต์</label>
+
+            <div className="wow-search-box">
+              <input
+                id="site-search"
+                name="siteSearch"
+                type="search"
+                placeholder="ค้นหา เช่น คดีมรดก ที่ดิน สัญญา..."
+                autoFocus
+              />
+
+              <button type="submit">ค้นหา</button>
+
+              <button
+                type="button"
+                className="wow-search-close"
+                onClick={() => setSearchOpen(false)}
+                aria-label="ปิดช่องค้นหา"
+              >
+                ✕
+              </button>
+            </div>
+          </form>
+        )}
+      </nav>
       <section className="hero">
         <div className="logo">⚖</div>
         <p className="eyebrow">NOPPAKAO LAW OFFICE</p>
@@ -145,6 +354,37 @@ export default function App() {
           </button>
         </div>
       </section>
+
+      <section className="free-member-offer" aria-labelledby="free-member-title">
+        <div className="free-member-icon" aria-hidden="true">✓</div>
+
+        <div className="free-member-copy">
+          <span className="free-member-label">สิทธิสำหรับสมาชิกใหม่</span>
+          <h2 id="free-member-title">
+            สมัครสมาชิกฟรี รับสิทธิถามกฎหมาย 5 คำถาม
+          </h2>
+          <p>
+            เมื่อใช้สิทธิครบแล้ว เลือกแพ็กเกจรายเดือน รายปี หรือ VIP
+            ได้ตามต้องการ
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="free-member-button"
+          onClick={() => setMode(user ? "dashboard" : "auth")}
+        >
+          {user ? "ไปที่แดชบอร์ด" : "สมัครสมาชิกฟรี"}
+        </button>
+      </section>
+
+      <LegalContentHub
+        onConsult={() => setMode(user ? "dashboard" : "auth")}
+      />
+
+      <ContactSection
+        onConsult={() => setMode(user ? "dashboard" : "auth")}
+      />
     </main>
   );
 }
@@ -204,7 +444,7 @@ function Auth({ form, setForm, register, login, resetPassword, msg, back }) {
 function Dashboard({ user, profile, isAdmin, logout, home }) {
   return (
     <main className="dashboard">
-      <aside>
+      <aside className="dashboard-sidebar">
         <div className="brand">⚖ นพเก้า</div>
         <button onClick={home}>หน้าเว็บไซต์</button>
         <button type="button" onClick={() => document.getElementById(isAdmin ? "admin-summary" : "member-info")?.scrollIntoView({ behavior: "smooth", block: "start" })}>ข้อมูลสมาชิก</button>
@@ -216,7 +456,7 @@ function Dashboard({ user, profile, isAdmin, logout, home }) {
           <button type="button" onClick={() => document.getElementById("admin-appointments")?.scrollIntoView({ behavior: "smooth", block: "start" })}>จัดการนัดหมาย</button>
           </>
         )}
-        <button onClick={logout}>ออกจากระบบ</button>
+        <button className="sidebar-logout" onClick={logout}>ออกจากระบบ</button>
       </aside>
       <section className="content">
         <p className="eyebrow">
@@ -259,15 +499,44 @@ function MemberDashboard({ user, profile }) {
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState("");
   const [used, setUsed] = useState(profile?.questionUsed || 0);
-  const [paymentPlan, setPaymentPlan] = useState("monthly");
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentDateTime, setPaymentDateTime] = useState("");
-  const [paymentReference, setPaymentReference] = useState("");
+  const paymentPlans = {
+    monthly_99: {
+      label: "รายเดือน",
+      amount: 99,
+      duration: "30 วัน",
+      questionLimit: 20,
+      dailyQuestionLimit: 1,
+    },
+    monthly_199: {
+      label: "รายเดือนพิเศษ",
+      amount: 199,
+      duration: "30 วัน",
+      questionLimit: 45,
+      dailyQuestionLimit: 2,
+    },
+    yearly: {
+      label: "รายปี",
+      amount: 999,
+      duration: "1 ปี",
+      questionLimit: 230,
+      dailyQuestionLimit: 5,
+    },
+    vip: {
+      label: "VIP",
+      amount: 1999,
+      duration: "3 ปี",
+      questionLimit: 700,
+      dailyQuestionLimit: 8,
+    },
+  };
+
+  const [paymentPlan, setPaymentPlan] = useState("monthly_99");
   const [sendingPayment, setSendingPayment] = useState(false);
   const [paymentNotice, setPaymentNotice] = useState("");
   const [appointment, setAppointment] = useState({ caseType: "คดีมรดก", appointDate: "", appointTime: "" });
   const [appointmentNotice, setAppointmentNotice] = useState("");
  const [memberAppointments, setMemberAppointments] = useState([]);
+  const [memberQuestions, setMemberQuestions] = useState([]);
   const [sendingAppointment, setSendingAppointment] = useState(false);
 
   useEffect(() => {
@@ -288,7 +557,7 @@ function MemberDashboard({ user, profile }) {
       }
     }
 
-    if (user?.uid) loadMemberAppointments();
+    if (user?.uid) { loadMemberAppointments(); getDocs(query(collection(db, "questions"), where("userId", "==", user.uid))).then((snap) => { if (active) setMemberQuestions(snap.docs.map((item) => ({ id: item.id, ...item.data() }))); }).catch((e) => { if (active) setNotice(e.message); }); }
     return () => { active = false; };
   }, [user?.uid]);
 
@@ -304,59 +573,69 @@ function MemberDashboard({ user, profile }) {
     e.preventDefault();
     setNotice("");
 
-    if (!user?.uid) {
-      setNotice("ไม่พบข้อมูลผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่");
+    if (!user) {
+      setNotice("กรุณาเข้าสู่ระบบก่อนส่งคำถาม");
       return;
     }
 
+    const subject = title.trim();
+    const questionDetail = detail.trim();
+
+    if (subject.length < 3) {
+      setNotice("หัวข้อคำถามต้องมีอย่างน้อย 3 ตัวอักษร");
+      return;
+    }
+
+    if (questionDetail.length < 10) {
+      setNotice(
+        "รายละเอียดคำถามต้องมีอย่างน้อย 10 ตัวอักษร",
+      );
+      return;
+    }
+
+    setSending(true);
+
     try {
-      setSending(true);
+      const submitQuestionSecure = httpsCallable(
+        functions,
+        "submitQuestionSecure",
+      );
 
-      const userRef = doc(db, "users", user.uid);
-      const questionRef = doc(collection(db, "questions"));
-
-      await runTransaction(db, async (transaction) => {
-        const userSnap = await transaction.get(userRef);
-
-        if (!userSnap.exists()) {
-          throw new Error("ไม่พบข้อมูลสมาชิก");
-        }
-
-        const member = userSnap.data();
-        const currentUsed = Number(member.questionUsed || 0);
-        const currentLimit = Number(member.questionLimit || 0);
-
-        if (member.status !== "active") {
-          throw new Error("บัญชีนี้ยังไม่พร้อมใช้งาน");
-        }
-
-        if (currentUsed >= currentLimit) {
-          throw new Error("สิทธิ์คำถามหมดหรือยังไม่ได้รับสิทธิ์");
-        }
-
-        transaction.set(questionRef, {
-          userId: user.uid,
-          userName: member.name || user.displayName || "",
-          userEmail: member.email || user.email || "",
-          subject: title.trim(),
-          detail: detail.trim(),
-          status: "pending",
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-
-        transaction.update(userRef, {
-          questionUsed: currentUsed + 1,
-          updatedAt: serverTimestamp(),
-        });
+      const response = await submitQuestionSecure({
+        subject,
+        detail: questionDetail,
       });
 
-      setUsed((value) => value + 1);
+      const result = response.data || {};
+
+      if (!result.ok) {
+        throw new Error(
+          result.message || "ไม่สามารถส่งคำถามได้",
+        );
+      }
+
+      setUsed(
+        Number(
+          result.questionUsed ??
+            profile?.questionUsed ??
+            0,
+        ),
+      );
+
       setTitle("");
       setDetail("");
-      setNotice("ส่งคำถามเรียบร้อยแล้ว");
-    } catch (err) {
-      setNotice(err.message || "ไม่สามารถส่งคำถามได้");
+      setNotice(
+        result.message || "ส่งคำถามเรียบร้อยแล้ว",
+      );
+    } catch (error) {
+      console.error("submitQuestion error:", error);
+
+      const message =
+        error?.details ||
+        error?.message ||
+        "ไม่สามารถส่งคำถามได้";
+
+      setNotice(message);
     } finally {
       setSending(false);
     }
@@ -366,11 +645,14 @@ function MemberDashboard({ user, profile }) {
     e.preventDefault();
     setPaymentNotice("");
 
-    const amount = Number(paymentAmount);
-    if (!amount || amount <= 0 || !paymentDateTime || !paymentReference.trim()) {
-      setPaymentNotice("กรุณากรอกข้อมูลการชำระเงินให้ครบ");
+    const selectedPlan = paymentPlans[paymentPlan];
+
+    if (!selectedPlan) {
+      setPaymentNotice("ไม่พบแพ็กเกจที่เลือก");
       return;
     }
+
+    const amount = selectedPlan.amount;
 
     setSendingPayment(true);
     try {
@@ -381,16 +663,29 @@ function MemberDashboard({ user, profile }) {
         userEmail: profile?.email || user.email || "",
         plan: paymentPlan,
         amount,
-        paidAt: paymentDateTime,
-        reference: paymentReference.trim(),
         status: "pending",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      const response = await fetch(
+        "https://us-central1-hlongheng-law.cloudfunctions.net/createCheckoutSession",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+          paymentId: paymentRef.id,
+          returnUrl: window.location.origin,
+        }),
+        }
+      );
 
-      setPaymentAmount("");
-      setPaymentDateTime("");
-      setPaymentReference("");
+      const checkout = await response.json();
+
+      if (!response.ok || !checkout.url) {
+        throw new Error(checkout.error || "ไม่สามารถเปิดหน้าชำระเงินได้");
+      }
+
+      window.location.href = checkout.url;
       setPaymentNotice("แจ้งชำระเงินเรียบร้อยแล้ว รอผู้ดูแลตรวจสอบ");
     } catch (error) {
       setPaymentNotice(error.message);
@@ -446,17 +741,38 @@ function MemberDashboard({ user, profile }) {
   return (
     <>
       <div id="member-info" className="cards">
-        <Card title="สถานะสมาชิก" value={profile?.plan || "free"} />
+        <Card
+            title="สถานะสมาชิก"
+            value={
+              {
+                free: "ฟรี",
+                monthly_99: "รายเดือน",
+                monthly_199: "รายเดือนพิเศษ",
+                monthly: "รายเดือน",
+                yearly: "รายปี",
+                vip: "VIP",
+              }[profile?.plan] || "ฟรี"
+            }
+          />
         <Card title="สิทธิ์คำถาม" value={`${used} / ${limitValue}`} />
         <Card title="สิทธิ์คงเหลือ" value={remaining} />
-        <Card title="สถานะบัญชี" value={profile?.status || "active"} />
+        <Card
+            title="สถานะบัญชี"
+            value={
+              {
+                active: "ใช้งาน",
+                inactive: "ระงับการใช้งาน",
+                suspended: "ถูกระงับ",
+              }[profile?.status] || "ใช้งาน"
+            }
+          />
       </div>
 
       <section id="consultation-form" className="panel">
         <h3>ส่งคำถามปรึกษา</h3>
         <p>กรอกหัวข้อและรายละเอียดคำถามให้ครบถ้วน</p>
 
-        <form onSubmit={submitQuestion}>
+        <form className="question-compact-form" onSubmit={submitQuestion}>
           <input
             required
             minLength="3"
@@ -493,21 +809,38 @@ function MemberDashboard({ user, profile }) {
       </section>
       <section className="card">
         <h3>แจ้งชำระเงิน</h3>
-        <form onSubmit={submitPayment}>
+        <form className="payment-compact-form" onSubmit={submitPayment}>
           <select value={paymentPlan} onChange={(e) => setPaymentPlan(e.target.value)}>
-            <option value="monthly">รายเดือน</option>
-            <option value="yearly">รายปี</option>
+            <option value="monthly_99">
+              รายเดือน 99 บาท
+            </option>
+            <option value="monthly_199">
+              รายเดือนพิเศษ 199 บาท
+            </option>
+            <option value="yearly">
+              รายปี 999 บาท
+            </option>
+            <option value="vip">
+              VIP 1,999 บาท
+            </option>
           </select>
-          <input type="number" min="1" step="0.01" required placeholder="จำนวนเงิน (บาท)" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} />
-          <input type="datetime-local" required value={paymentDateTime} onChange={(e) => setPaymentDateTime(e.target.value)} />
-          <input type="text" required placeholder="เลขอ้างอิงรายการโอน" value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} />
-          <button className="primary" type="submit" disabled={sendingPayment}>{sendingPayment ? "กำลังส่ง..." : "แจ้งชำระเงิน"}</button>
+          <div className="payment-plan-summary">
+              <strong>
+                {paymentPlans[paymentPlan]?.amount.toLocaleString("th-TH")} บาท
+              </strong>
+              <span>
+                {paymentPlans[paymentPlan]?.duration} • รวม{" "}
+                {paymentPlans[paymentPlan]?.questionLimit} คำถาม • ไม่เกิน{" "}
+                {paymentPlans[paymentPlan]?.dailyQuestionLimit} คำถามต่อวัน
+              </span>
+            </div>
+          <button className="primary" type="submit" disabled={sendingPayment}>{sendingPayment ? "กำลังเปิดหน้าชำระเงิน..." : "ชำระผ่าน PromptPay"}</button>
         </form>
         {paymentNotice && <p className="notice">{paymentNotice}</p>}
       </section>
 <section className="card">
   <h3>นัดหมายทนาย</h3>
-  <form onSubmit={submitAppointment}>
+  <form className="appointment-compact-form" onSubmit={submitAppointment}>
     <select
       value={appointment.caseType}
       onChange={(e) => setAppointment({ ...appointment, caseType: e.target.value })}
@@ -557,6 +890,7 @@ function MemberDashboard({ user, profile }) {
           )}
         </div>
       </section>
+ <section className="card"><h3>คำถามของฉัน</h3>{memberQuestions.map((q) => <details key={q.id}><summary>{q.subject || "ดูคำตอบ"}</summary><p>{q.question || q.detail}</p><p>{q.answer || "อยู่ระหว่างรอคำตอบ"}</p></details>)}</section>
     </>
   );
 }
@@ -781,7 +1115,11 @@ function AdminDashboard() {
           value={loading ? "..." : stats.payments}
         />
       </div>
-      <section className="panel adminPanel">
+            <AdminPageRouter />
+
+      <AdminMemberManager />
+
+<section className="panel adminPanel">
         <div className="sectionHead">
           <h3 id="admin-members">สมาชิกล่าสุด</h3>
           <button className="secondary small" onClick={load}>
@@ -859,16 +1197,14 @@ function AdminDashboard() {
                 <strong>{p.userName || p.userEmail || "ไม่ระบุสมาชิก"}</strong>
                 <p>แพ็กเกจ: {p.plan || "-"}</p>
                 <p>จำนวนเงิน: {p.amount || 0} บาท</p>
-                <p>วันเวลาโอน: {p.paidAt || "-"}</p>
-                <p>เลขอ้างอิง: {p.reference || "-"}</p>
+                      <p>ชำระเมื่อ: {p.paidAt?.toDate ? p.paidAt.toDate().toLocaleString("th-TH") : "-"}</p>
+                <p>Stripe Payment ID: {p.stripePaymentIntentId || "-"}</p>
               </div>
               <div>
                 <span>{adminStatusLabel(p.status)}</span>
                 {(p.status || "pending") === "pending" && (
                   <div className="actions">
-                    <button className="primary" onClick={() => approvePayment(p)}>
-                      อนุมัติ
-                    </button>
+                    <span className="payment-auto-note">ตรวจสอบอัตโนมัติผ่าน Stripe</span>
                     <button className="secondary" onClick={() => rejectPayment(p)}>
                       ปฏิเสธ
                     </button>

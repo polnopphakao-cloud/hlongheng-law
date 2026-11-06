@@ -1,0 +1,125 @@
+import { useEffect } from "react";
+
+const MENU_MAP = [
+  { label: "ข้อมูลสมาชิก", key: "members" },
+  { label: "คำถามปรึกษา", key: "questions" },
+  { label: "จัดการสมาชิก", key: "member-manager" },
+  { label: "การชำระเงิน", key: "payments" },
+  { label: "จัดการนัดหมาย", key: "appointments" },
+];
+
+const PANEL_MATCHERS = {
+  members: ["สมาชิกทั้งหมด", "สมาชิกล่าสุด"],
+  questions: ["คำถามทั้งหมด", "คำถามปรึกษา", "รายการคำถาม"],
+  "member-manager": ["จัดการสิทธิสมาชิก"],
+  payments: ["รายการชำระเงิน", "การชำระเงินทั้งหมด"],
+  appointments: ["จัดการนัดหมาย", "รายการนัดหมาย", "นัดหมายทั้งหมด"],
+};
+
+function normalize(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function findMenuControl(label) {
+  const controls = Array.from(
+    document.querySelectorAll("a, button"),
+  );
+  return controls.find(
+    (element) => normalize(element.textContent) === label,
+  );
+}
+
+function findPanelForKey(key) {
+  const texts = PANEL_MATCHERS[key] || [];
+  const panels = Array.from(
+    document.querySelectorAll("section.panel, .adminPanel"),
+  );
+
+  return panels.find((panel) => {
+    const text = normalize(panel.textContent);
+    return texts.some((candidate) => text.includes(candidate));
+  });
+}
+
+function findStatsContainer() {
+  const elements = Array.from(document.querySelectorAll("div"));
+  const matches = elements.filter((element) => {
+    const text = normalize(element.textContent);
+    return (
+      text.includes("สมาชิกทั้งหมด") &&
+      text.includes("คำถามทั้งหมด") &&
+      text.includes("การชำระเงินทั้งหมด")
+    );
+  });
+
+  return matches.sort(
+    (left, right) =>
+      left.querySelectorAll("*").length -
+      right.querySelectorAll("*").length,
+  )[0] || null;
+}
+
+export default function AdminPageRouter() {
+  useEffect(() => {
+    const controls = MENU_MAP.map((item) => ({
+      ...item,
+      element: findMenuControl(item.label),
+    })).filter((item) => item.element);
+
+    const panels = Object.keys(PANEL_MATCHERS)
+      .map((key) => ({ key, element: findPanelForKey(key) }))
+      .filter((item) => item.element);
+
+    const stats = findStatsContainer();
+
+    // JavaScript has no Python-style False. Keep this assignment local.
+    const activatePage = (key, replaceHistory = false) => {
+      panels.forEach(({ key: panelKey, element }) => {
+        const visible = panelKey === key;
+        element.classList.toggle("admin-page-hidden", !visible);
+        element.setAttribute("aria-hidden", visible ? "false" : "true");
+      });
+      controls.forEach(({ key: controlKey, element }) => {
+        const active = controlKey === key;
+        element.classList.toggle("admin-menu-active", active);
+        element.setAttribute("aria-current", active ? "page" : "false");
+      });
+      if (stats) stats.classList.add("admin-page-hidden");
+      const nextHash = `#admin-${key}`;
+      if (window.location.hash !== nextHash) {
+        const method = replaceHistory ? "replaceState" : "pushState";
+        window.history[method]({ adminPage: key }, "", nextHash);
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    const cleanup = [];
+    controls.forEach(({ key, element }) => {
+      const handler = (event) => {
+        event.preventDefault();
+        activatePage(key);
+      };
+      element.addEventListener("click", handler);
+      cleanup.push(() => element.removeEventListener("click", handler));
+    });
+
+    const initialKey = window.location.hash.startsWith("#admin-")
+      ? window.location.hash.replace("#admin-", "")
+      : "members";
+    const validInitial = PANEL_MATCHERS[initialKey]
+      ? initialKey
+      : "members";
+    activatePage(validInitial, true);
+
+    const popHandler = () => {
+      const key = window.location.hash.replace("#admin-", "");
+      activatePage(PANEL_MATCHERS[key] ? key : "members", true);
+    };
+    window.addEventListener("popstate", popHandler);
+    cleanup.push(() => window.removeEventListener("popstate", popHandler));
+
+    return () => cleanup.forEach((fn) => fn());
+  }, []);
+
+  return null;
+}
