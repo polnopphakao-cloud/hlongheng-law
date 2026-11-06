@@ -2638,3 +2638,7 @@ form textarea::placeholder {
 }
 
 /* === HLONGHENG ANSWER BOX PATCH END === */
+
+
+/* === PHASE2 EMAIL SECURITY STYLES === */
+.email-verification{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin:18px 0 24px;padding:18px 20px;border-radius:15px;border:1px solid #475569;background:#0f172a}.email-verification p{margin:5px 0 0;color:#cbd5e1}.email-verification.needs-verification{border-color:#d97706;background:rgba(217,119,6,.10)}.email-verification.is-verified{border-color:#16a34a;background:rgba(22,163,74,.10)}.verification-actions{display:flex;gap:10px;flex-wrap:wrap}.verification-actions button{padding:10px 14px;border:1px solid #d6a94f;border-radius:9px;background:#172033;color:#f8fafc;cursor:pointer}.verification-actions button:disabled{opacity:.55;cursor:not-allowed}.verification-notice{width:100%;color:#fbbf24!important}@media(max-width:700px){.verification-actions,.verification-actions button{width:100%}}

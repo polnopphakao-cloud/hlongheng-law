@@ -1,9 +1,12 @@
+// === PHASE2 EMAIL SECURITY INSTALLED ===
 import { useEffect, useState } from "react";
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
+  sendEmailVerification,
+  reload,
   signOut,
   updateProfile,
 } from "firebase/auth";
@@ -84,7 +87,11 @@ export default function App() {
         status: "active",
         createdAt: serverTimestamp(),
       });
-      setMsg("สมัครสมาชิกสำเร็จ");
+      await sendEmailVerification(c.user, {
+        url: `${window.location.origin}/`,
+        handleCodeInApp: false,
+      });
+      setMsg("สมัครสมาชิกสำเร็จ กรุณาตรวจอีเมลเพื่อยืนยันบัญชีก่อนใช้บริการสำคัญ");
     } catch (err) {
       setMsg(err.message);
     }
@@ -442,6 +449,43 @@ function Auth({ form, setForm, register, login, resetPassword, msg, back }) {
 }
 
 function Dashboard({ user, profile, isAdmin, logout, home }) {
+  const [verificationNotice, setVerificationNotice] = useState("");
+  const [verificationBusy, setVerificationBusy] = useState(false);
+
+  async function resendVerification() {
+    setVerificationNotice("");
+    setVerificationBusy(true);
+    try {
+      await sendEmailVerification(user, {
+        url: `${window.location.origin}/`,
+        handleCodeInApp: false,
+      });
+      setVerificationNotice("ส่งอีเมลยืนยันแล้ว กรุณาตรวจกล่องจดหมายและจดหมายขยะ");
+    } catch (error) {
+      setVerificationNotice("ยังไม่สามารถส่งอีเมลยืนยันได้ กรุณารอสักครู่แล้วลองใหม่");
+    } finally {
+      setVerificationBusy(false);
+    }
+  }
+
+  async function refreshVerification() {
+    setVerificationNotice("");
+    setVerificationBusy(true);
+    try {
+      await reload(user);
+      if (auth.currentUser?.emailVerified) {
+        setVerificationNotice("ยืนยันอีเมลเรียบร้อยแล้ว กำลังโหลดข้อมูลใหม่...");
+        window.setTimeout(() => window.location.reload(), 700);
+      } else {
+        setVerificationNotice("ยังไม่พบการยืนยันอีเมล กรุณาเปิดลิงก์ในอีเมลก่อน");
+      }
+    } catch (error) {
+      setVerificationNotice("ตรวจสอบสถานะไม่สำเร็จ กรุณาลองใหม่");
+    } finally {
+      setVerificationBusy(false);
+    }
+  }
+
   return (
     <main className="dashboard">
       <aside className="dashboard-sidebar">
@@ -463,6 +507,21 @@ function Dashboard({ user, profile, isAdmin, logout, home }) {
           {isAdmin ? "ADMIN CONTROL CENTER" : "MEMBER CENTER"}
         </p>
         <h2>สวัสดี {profile?.name || user.displayName || user.email}</h2>
+        {!isAdmin && (
+          <section className={`email-verification ${user.emailVerified ? "is-verified" : "needs-verification"}`}>
+            <div>
+              <strong>{user.emailVerified ? "✓ ยืนยันอีเมลแล้ว" : "กรุณายืนยันอีเมล"}</strong>
+              <p>{user.emailVerified ? "บัญชีพร้อมใช้บริการสมาชิก" : "ต้องยืนยันอีเมลก่อนส่งคำถาม ชำระเงิน หรือนัดหมาย"}</p>
+            </div>
+            {!user.emailVerified && (
+              <div className="verification-actions">
+                <button type="button" onClick={resendVerification} disabled={verificationBusy}>ส่งอีเมลยืนยันอีกครั้ง</button>
+                <button type="button" onClick={refreshVerification} disabled={verificationBusy}>ตรวจสอบสถานะ</button>
+              </div>
+            )}
+            {verificationNotice && <p className="verification-notice">{verificationNotice}</p>}
+          </section>
+        )}
         {isAdmin ? (
           <AdminDashboard />
         ) : (
@@ -572,6 +631,10 @@ function MemberDashboard({ user, profile }) {
   async function submitQuestion(e) {
     e.preventDefault();
     setNotice("");
+    if (!user.emailVerified) {
+      setNotice("กรุณายืนยันอีเมลก่อนส่งคำถาม");
+      return;
+    }
 
     if (!user) {
       setNotice("กรุณาเข้าสู่ระบบก่อนส่งคำถาม");
@@ -644,6 +707,10 @@ function MemberDashboard({ user, profile }) {
   async function submitPayment(e) {
     e.preventDefault();
     setPaymentNotice("");
+    if (!user.emailVerified) {
+      setPaymentNotice("กรุณายืนยันอีเมลก่อนทำรายการชำระเงิน");
+      return;
+    }
 
     const selectedPlan = paymentPlans[paymentPlan];
 
@@ -697,6 +764,10 @@ function MemberDashboard({ user, profile }) {
     async function submitAppointment(e) {
     e.preventDefault();
     setAppointmentNotice("");
+    if (!user.emailVerified) {
+      setAppointmentNotice("กรุณายืนยันอีเมลก่อนส่งคำขอนัดหมาย");
+      return;
+    }
 
     if (!appointment.appointDate || !appointment.appointTime) {
       setAppointmentNotice("กรุณาเลือกวันและเวลานัดหมาย");
@@ -984,6 +1055,14 @@ function AdminDashboard() {
     await updateDoc(doc(db, "users", uid), {
       ...values,
       updatedAt: serverTimestamp(),
+    });
+    await addDoc(collection(db, "adminLogs"), {
+      adminUid: auth.currentUser?.uid || "",
+      action: "change_member_plan",
+      targetUid: uid,
+      newPlan: values.plan,
+      questionLimit: values.questionLimit,
+      createdAt: serverTimestamp(),
     });
     await load();
   }

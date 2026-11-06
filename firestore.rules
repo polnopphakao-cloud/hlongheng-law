@@ -57,7 +57,7 @@ match /admins/{adminUid} {
 
       // ผู้ใช้สร้างเอกสารของตนเองได้เท่านั้น
       // และ UID ภายในเอกสารต้องตรงกับผู้เข้าสู่ระบบ
-      allow create: if isOwner(userUid)
+      allow create: if isOwner(userUid);
 
       // ผู้ใช้ทั่วไปแก้เฉพาะข้อมูลพื้นฐานของตนเอง
       // ห้ามแก้สิทธิ์ บทบาท และสถานะบัญชี
@@ -131,6 +131,7 @@ match /questions/{questionId} {
   // สมาชิกสร้างคำถามในชื่อตนเองเท่านั้น
   allow create: if isSignedIn()
     && request.resource.data.userId == request.auth.uid
+    && request.auth.token.email_verified == true
     && request.resource.data.status == "pending"
     && request.resource.data.keys().hasOnly([
       "userId",
@@ -159,9 +160,16 @@ match /payments/{paymentId} {
   // ยังไม่อนุญาตให้แก้ไขหรือลบผ่านหน้าเว็บไซต์
   allow create: if request.auth != null
       && request.resource.data.userId == request.auth.uid
+      && request.auth.token.email_verified == true
       && request.resource.data.status == "pending"
       && request.resource.data.amount > 0
-      && request.resource.data.plan in ["monthly", "yearly"];
+      && request.resource.data.plan in [
+        "monthly",
+        "monthly_99",
+        "monthly_199",
+        "yearly",
+        "vip"
+      ];
     allow update: if isAdmin();
     allow delete: if false;
 }
@@ -172,6 +180,7 @@ match /payments/{paymentId} {
     match /appointments/{appointmentId} {
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid
+      && request.auth.token.email_verified == true
         && request.resource.data.status == "pending"
         && request.resource.data.keys().hasOnly([
           "userId", "userName", "userEmail", "caseType",
@@ -181,6 +190,26 @@ match /payments/{paymentId} {
         && (resource.data.userId == request.auth.uid || isAdmin());
       allow update: if isAdmin();
       allow delete: if false;
+    }
+
+    // ==========================
+    // การแจ้งเตือนสำหรับผู้ดูแล
+    // ==========================
+    match /adminNotifications/{notificationId} {
+      allow read: if isAdmin();
+
+      allow update: if isAdmin()
+        && request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly([
+            "isRead",
+            "updatedAt"
+          ])
+        && request.resource.data.isRead
+          is bool;
+
+      allow create, delete: if false;
     }
 
     match /{document=**} {
