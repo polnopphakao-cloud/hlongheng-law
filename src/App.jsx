@@ -36,6 +36,28 @@ import ContactSection from "./components/ContactSection";
 
 const empty = { name: "", email: "", password: "" };
 
+
+
+// รอ Firebase Authentication คืนสถานะผู้ใช้ก่อนทำรายการชำระเงิน
+function waitForAuthenticatedUser(timeoutMs = 10000) {
+  if (auth.currentUser) return Promise.resolve(auth.currentUser);
+
+  return new Promise((resolve, reject) => {
+    let unsubscribe = () => {};
+    const timer = window.setTimeout(() => {
+      unsubscribe();
+      reject(new Error("AUTH_USER_NOT_READY"));
+    }, timeoutMs);
+
+    unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (!currentUser) return;
+      window.clearTimeout(timer);
+      unsubscribe();
+      resolve(currentUser);
+    });
+  });
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -734,11 +756,14 @@ function MemberDashboard({ user, profile }) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      const currentAuthUser = await waitForAuthenticatedUser();
+      const idToken = await currentAuthUser.getIdToken(true);
       const response = await fetch(
         "https://us-central1-hlongheng-law.cloudfunctions.net/createCheckoutSession",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+          Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
           body: JSON.stringify({
           paymentId: paymentRef.id,
           returnUrl: window.location.origin,
