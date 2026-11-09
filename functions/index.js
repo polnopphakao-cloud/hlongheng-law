@@ -3,6 +3,7 @@ const {onDocumentCreated} = require("firebase-functions/v2/firestore");
 const {defineSecret} = require("firebase-functions/params");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
+const {getAuth} = require("firebase-admin/auth");
 initializeApp();
 const db = getFirestore();
 const PLAN_CONFIG = Object.freeze({
@@ -56,6 +57,28 @@ exports.createCheckoutSession = onRequest(
   { secrets: [stripeSecretKey], cors: true },
   async (req, res) => {
     try {
+      if (req.method !== "POST") {
+        return res.status(405).json({error: "Method not allowed"});
+      }
+
+      const authorization = String(req.headers.authorization || "");
+      const match = authorization.match(/^Bearer\s+(.+)$/i);
+      if (!match) {
+        return res.status(401).json({error: "กรุณาเข้าสู่ระบบก่อนชำระเงิน"});
+      }
+
+      let decodedToken;
+      try {
+        decodedToken = await getAuth().verifyIdToken(match[1], true);
+      } catch (error) {
+        console.error("Invalid Firebase ID token", error.message);
+        return res.status(401).json({error: "เซสชันเข้าสู่ระบบไม่ถูกต้องหรือหมดอายุ"});
+      }
+
+      if (decodedToken.email_verified !== true) {
+        return res.status(403).json({error: "กรุณายืนยันอีเมลก่อนชำระเงิน"});
+      }
+
       const paymentId = String(req.body?.paymentId || "").trim();
       const requestedReturnUrl = String(req.body?.returnUrl || "").trim();
 
@@ -98,6 +121,12 @@ exports.createCheckoutSession = onRequest(
         });
       }
 
+      if (payment.userId !== decodedToken.uid) {
+        return res.status(403).json({
+          error: "ไม่มีสิทธิสร้างหน้าชำระเงินสำหรับรายการนี้",
+        });
+      }
+
       const planCode = String(payment.plan || "");
       const planConfig = PLAN_CONFIG[planCode];
 
@@ -109,6 +138,25 @@ exports.createCheckoutSession = onRequest(
 
       const Stripe = require("stripe");
       const stripe = new Stripe(stripeSecretKey.value());
+
+
+      // กดซ้ำให้ใช้ Checkout Session เดิม ถ้ายังเปิดอยู่
+      if (payment.stripeCheckoutSessionId) {
+        try {
+          const existingSession = await stripe.checkout.sessions.retrieve(
+            payment.stripeCheckoutSessionId,
+          );
+          if (existingSession.status === "open" && existingSession.url) {
+            return res.status(200).json({
+              url: existingSession.url,
+              sessionId: existingSession.id,
+              reused: true,
+            });
+          }
+        } catch (error) {
+          console.warn("Unable to reuse Checkout Session", error.message);
+        }
+      }
 
       const session = await stripe.checkout.sessions.create({
         mode: "payment",
@@ -142,6 +190,8 @@ exports.createCheckoutSession = onRequest(
 
         success_url: `${returnUrl}/?payment=success`,
         cancel_url: `${returnUrl}/?payment=cancelled`,
+      }, {
+        idempotencyKey: `checkout-${paymentId}`,
       });
 
       await paymentRef.update({
@@ -152,6 +202,17 @@ exports.createCheckoutSession = onRequest(
         durationDays: planConfig.durationDays,
         stripeCheckoutSessionId: session.id,
         updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      await db.collection("paymentAuditLogs").add({
+        action: "checkout_created",
+        paymentId,
+        userId: decodedToken.uid,
+        plan: planCode,
+        amount: planConfig.amount,
+        currency: "thb",
+        stripeCheckoutSessionId: session.id,
+        createdAt: FieldValue.serverTimestamp(),
       });
 
       return res.status(200).json({
