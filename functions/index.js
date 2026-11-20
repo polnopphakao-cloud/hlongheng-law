@@ -449,6 +449,87 @@ exports.stripeWebhook = onRequest(
             });
           });
         }
+      } else if (event.type === "checkout.session.expired") {
+        const session = event.data.object;
+        const sessionId = String(session.id || "").trim();
+
+        if (!sessionId) {
+          await eventRef.set({
+            type: event.type,
+            status: "rejected_missing_checkout_session_id",
+            createdAt: FieldValue.serverTimestamp(),
+          });
+        } else {
+          const paymentQuery = await db.collection("payments")
+            .where("stripeCheckoutSessionId", "==", sessionId)
+            .limit(1)
+            .get();
+
+          if (paymentQuery.empty) {
+            await eventRef.set({
+              type: event.type,
+              stripeCheckoutSessionId: sessionId,
+              status: "expired_payment_not_found",
+              createdAt: FieldValue.serverTimestamp(),
+            });
+          } else {
+            const paymentDoc = paymentQuery.docs[0];
+            const paymentRef = paymentDoc.ref;
+
+            await db.runTransaction(async (transaction) => {
+              const [eventSnapshot, paymentSnapshot] = await Promise.all([
+                transaction.get(eventRef),
+                transaction.get(paymentRef),
+              ]);
+
+              if (eventSnapshot.exists) return;
+              if (!paymentSnapshot.exists) return;
+
+              const payment = paymentSnapshot.data();
+
+              // ห้ามเปลี่ยนรายการที่ชำระสำเร็จหรือคืนเงินแล้ว
+              if (payment.status === "paid" || payment.status === "refunded") {
+                transaction.set(eventRef, {
+                  type: event.type,
+                  paymentId: paymentDoc.id,
+                  userId: payment.userId || null,
+                  stripeCheckoutSessionId: sessionId,
+                  status: "expired_event_ignored_for_final_payment",
+                  createdAt: FieldValue.serverTimestamp(),
+                });
+                return;
+              }
+
+              transaction.update(paymentRef, {
+                status: "expired",
+                expiredAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
+                stripeExpiredEventId: event.id,
+              });
+
+              transaction.set(eventRef, {
+                type: event.type,
+                paymentId: paymentDoc.id,
+                userId: payment.userId || null,
+                stripeCheckoutSessionId: sessionId,
+                status: "checkout_expired_recorded",
+                createdAt: FieldValue.serverTimestamp(),
+              });
+
+              transaction.set(db.collection("paymentAuditLogs").doc(), {
+                action: "checkout_expired",
+                stripeEventId: event.id,
+                paymentId: paymentDoc.id,
+                userId: payment.userId || null,
+                plan: payment.plan || null,
+                amount: payment.amount || null,
+                currency: payment.currency || "thb",
+                stripeCheckoutSessionId: sessionId,
+                createdAt: FieldValue.serverTimestamp(),
+              });
+            });
+          }
+        }
       } else if (event.type === "charge.refunded") {
         const charge = event.data.object;
         let paymentId = String(charge.metadata?.paymentId || "").trim();
