@@ -712,6 +712,11 @@ function MemberDashboard({ user, profile }) {
       setNotice(
         result.message || "ส่งคำถามเรียบร้อยแล้ว",
       );
+      if (typeof window !== "undefined" && typeof window.gtag === "function") {
+        window.gtag("event", "generate_lead", {
+          lead_source: "consultation_form",
+        });
+      }
     } catch (error) {
       console.error("submitQuestion error:", error);
 

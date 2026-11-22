@@ -1,5 +1,11 @@
 import { useState } from "react";
 
+function trackEvent(eventName, parameters = {}) {
+  if (typeof window !== "undefined" && typeof window.gtag === "function") {
+    window.gtag("event", eventName, parameters);
+  }
+}
+
 const contacts = [
   {
     icon: "☎",
@@ -52,7 +58,14 @@ export default function ContactSection({ onConsult }) {
           <h2 id="contact-title">ติดต่อสำนักงาน</h2>
           <p>ติดต่อสอบถาม นัดหมาย หรือส่งข้อมูลเบื้องต้นผ่านช่องทางที่สะดวก</p>
         </div>
-        <button type="button" className="contact-consult-button" onClick={onConsult}>
+        <button
+          type="button"
+          className="contact-consult-button"
+          onClick={() => {
+            trackEvent("consult_click", { contact_method: "online_consultation" });
+            onConsult();
+          }}
+        >
           ปรึกษาคดีออนไลน์
         </button>
       </div>
@@ -70,6 +83,19 @@ export default function ContactSection({ onConsult }) {
                 href={contact.href}
                 target={contact.href.startsWith("http") ? "_blank" : undefined}
                 rel={contact.href.startsWith("http") ? "noreferrer" : undefined}
+                onClick={() => {
+                  const eventName = contact.href.startsWith("tel:")
+                    ? "phone_click"
+                    : contact.href.startsWith("mailto:")
+                      ? "email_click"
+                      : contact.href.includes("line.me")
+                        ? "line_click"
+                        : "contact_click";
+                  trackEvent(eventName, {
+                    contact_method: contact.label,
+                    contact_value: contact.value,
+                  });
+                }}
               >
                 {contact.action}
               </a>
@@ -93,6 +119,7 @@ export default function ContactSection({ onConsult }) {
           href="https://maps.app.goo.gl/mwK1nZvhcJ8SMRCS9?g_st=ac"
           target="_blank"
           rel="noopener noreferrer"
+        onClick={() => trackEvent("map_click", { contact_method: "google_maps" })}
         >
           เปิดแผนที่และนำทาง
         </a>
