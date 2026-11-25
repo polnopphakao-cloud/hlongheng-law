@@ -54,7 +54,7 @@ const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
 const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
 
 exports.createCheckoutSession = onRequest(
-  { secrets: [stripeSecretKey], cors: true },
+  { secrets: [stripeSecretKey], cors: ["https://hlongheng.com", "https://www.hlongheng.com", "https://hlongheng-law.web.app"] },
   async (req, res) => {
     try {
       if (req.method !== "POST") {
