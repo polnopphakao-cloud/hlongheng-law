@@ -1,6 +1,7 @@
 const {onRequest, onCall, HttpsError} = require("firebase-functions/v2/https");
 const {onDocumentCreated} = require("firebase-functions/v2/firestore");
 const {defineSecret} = require("firebase-functions/params");
+const nodemailer = require("nodemailer");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 const {getAuth} = require("firebase-admin/auth");
@@ -52,6 +53,7 @@ const PLAN_CONFIG = Object.freeze({
 
 const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
 const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
+const gmailAppPassword = defineSecret("GMAIL_APP_PASSWORD");
 
 exports.createCheckoutSession = onRequest(
   { secrets: [stripeSecretKey], cors: ["https://hlongheng.com", "https://www.hlongheng.com", "https://hlongheng-law.web.app"] },
@@ -776,7 +778,10 @@ exports.submitQuestionSecure = onCall(
 // แจ้งเตือนแอดมินเมื่อมีสมาชิกใหม่
 // ==================================================
 exports.notifyAdminNewMember = onDocumentCreated(
-  "users/{userId}",
+  {
+    document: "users/{userId}",
+    secrets: [gmailAppPassword],
+  },
   async (event) => {
     const snapshot = event.data;
 
@@ -822,6 +827,27 @@ exports.notifyAdminNewMember = onDocumentCreated(
         merge: false,
       },
     );
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "polnopphakao@gmail.com",
+        pass: gmailAppPassword.value(),
+      },
+    });
+
+    await transporter.sendMail({
+      from: '"เว็บไซต์สำนักงานกฎหมายนพเก้า" <polnopphakao@gmail.com>',
+      to: "polnopphakao@gmail.com",
+      subject: "แจ้งเตือน: มีสมาชิกใหม่สมัครใช้งาน",
+      text:
+        "มีสมาชิกใหม่สมัครใช้งานเว็บไซต์\n\n" +
+        "ชื่อ: " + (member.name || "ไม่ระบุชื่อ") + "\n" +
+        "อีเมล: " + (member.email || "-") + "\n" +
+        "แพ็กเกจ: " + (member.plan || "free") + "\n" +
+        "รหัสสมาชิก: " + userId + "\n\n" +
+        "กรุณาเข้าสู่ Admin Dashboard เพื่อตรวจสอบข้อมูล",
+    });
 
     console.log(
       `สร้างการแจ้งเตือนสมาชิกใหม่แล้ว: ${userId}`,

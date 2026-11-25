@@ -1008,6 +1008,10 @@ function AdminDashboard() {
   const [answerText, setAnswerText] = useState("");
   const [savingAnswer, setSavingAnswer] = useState(false);
   const [newQuestionCount, setNewQuestionCount] = useState(0);
+  const [adminNotifications, setAdminNotifications] = useState([]);
+  const [newMemberCount, setNewMemberCount] = useState(0);
+  const [notificationFilter, setNotificationFilter] = useState("unread");
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -1019,6 +1023,22 @@ function AdminDashboard() {
       (snapshotError) => setError(snapshotError.message)
     );
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribeNotifications = onSnapshot(
+      collection(db, "adminNotifications"),
+      (snapshot) => {
+        const items = snapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() }))
+          .filter((item) => item.type === "new_member")
+          .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        setAdminNotifications(items);
+        setNewMemberCount(items.filter((item) => item.isRead !== true).length);
+      },
+      (snapshotError) => setError(snapshotError.message)
+    );
+    return () => unsubscribeNotifications();
   }, []);
 
   async function load() {
@@ -1213,6 +1233,35 @@ function AdminDashboard() {
     }
   }
 
+  async function markNotificationRead(notificationId) {
+    try {
+      await updateDoc(doc(db, "adminNotifications", notificationId), {
+        isRead: true,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    try {
+      const unreadItems = adminNotifications.filter(
+        (item) => item.isRead !== true
+      );
+      await Promise.all(
+        unreadItems.map((item) =>
+          updateDoc(doc(db, "adminNotifications", item.id), {
+            isRead: true,
+            updatedAt: serverTimestamp(),
+          })
+        )
+      );
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   return (
     <>
       {error && <p className="notice">{error}</p>}
@@ -1224,7 +1273,59 @@ function AdminDashboard() {
           value={loading ? "..." : stats.payments}
         />
       </div>
-            <AdminPageRouter />
+            <div className="panel">
+        <div className="sectionHead">
+          <h3>การแจ้งเตือน</h3>
+          <button
+            className="primary"
+            onClick={() => setShowNotifications(!showNotifications)}
+          >
+            สมาชิกใหม่
+            {newMemberCount > 0 && (
+              <span style={{ marginLeft: "8px", color: "#ff4d4f" }}>
+                {newMemberCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {showNotifications && (
+        <section className="panel adminPanel">
+          <div className="sectionHead">
+            <h3>แจ้งเตือนสมาชิกใหม่</h3>
+            <div className="actions">
+              <select value={notificationFilter} onChange={(e) => setNotificationFilter(e.target.value)}>
+                <option value="unread">ยังไม่อ่าน</option>
+                <option value="all">ทั้งหมด</option>
+                <option value="read">อ่านแล้ว</option>
+              </select>
+              {newMemberCount > 0 && <button className="secondary" onClick={markAllNotificationsRead}>รับทราบทั้งหมด</button>}
+            </div>
+          </div>
+          <div className="notificationList">
+            {adminNotifications.filter((item) => notificationFilter === "all" || (notificationFilter === "read" ? item.isRead === true : item.isRead !== true)).length === 0 ? (
+              <p>ไม่มีรายการแจ้งเตือน</p>
+            ) : adminNotifications.filter((item) => notificationFilter === "all" || (notificationFilter === "read" ? item.isRead === true : item.isRead !== true)).map((item) => (
+              <div className="listItem" key={item.id}>
+                <div>
+                  <strong>{item.userName || "ไม่ระบุชื่อ"}</strong>
+                  <p>{item.userEmail || "-"}</p>
+                  <p>แพ็กเกจ: {item.plan || "free"}</p>
+                  <p>สิทธิ์คำถาม: {item.questionLimit || 0}</p>
+                  <p>วันที่สมัคร: {item.memberCreatedAt?.toDate ? item.memberCreatedAt.toDate().toLocaleString("th-TH") : "-"}</p>
+                </div>
+                <div>
+                  <span>{item.isRead === true ? "รับทราบแล้ว" : "สมาชิกใหม่"}</span>
+                  {item.isRead !== true && <button className="primary" onClick={() => markNotificationRead(item.id)}>รับทราบ</button>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <AdminPageRouter />
 
       <AdminMemberManager />
 
